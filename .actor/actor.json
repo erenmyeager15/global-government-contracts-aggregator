@@ -1,7 +1,7 @@
 {
   "actorSpecification": 1,
   "name": "global-government-contracts-aggregator",
-  "title": "Global Government Contracts Scraper - SAM.gov, TED & UK Tenders",
+  "title": "Global Government Contracts & Tenders Scraper",
   "description": "Scrape public government contracts and tender notices from official sources: SAM.gov, EU TED, and UK Contracts Finder. Export normalized B2B procurement opportunity data.",
   "version": "1.0",
   "dockerfile": "Dockerfile",
@@ -31,4 +31,3 @@
     "timeoutSecs": 14400
   }
 }
-

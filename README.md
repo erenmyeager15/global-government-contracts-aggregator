@@ -1,4 +1,4 @@
-# Global Government Contracts Scraper - SAM.gov, TED & UK Tenders
+# Global Government Contracts & Tenders Scraper
 
 Scrape official public procurement notices from government sources and export normalized contract opportunity data for B2B research, tender monitoring, procurement analytics, and vendor sales workflows.
 
@@ -105,4 +105,3 @@ Use this Actor only for lawful purposes and in compliance with the source websit
 - SAM.gov requires a user-provided public API key.
 - EU TED Search API is public and does not require a key for published notices.
 - UK Contracts Finder returns OCDS data under the UK Open Government Licence.
-

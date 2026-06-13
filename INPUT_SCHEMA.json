@@ -1,5 +1,5 @@
 {
-  "title": "Global Government Contracts Aggregator Input",
+  "title": "Global Government Contracts & Tenders Scraper Input",
   "description": "Search official public procurement sources and export normalized contract/tender records.",
   "type": "object",
   "schemaVersion": 1,
@@ -81,4 +81,3 @@
   },
   "required": ["sources", "maxResults"]
 }
-

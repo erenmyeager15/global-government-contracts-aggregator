@@ -2,7 +2,7 @@
   "actorSpecification": 1,
   "views": {
     "contracts": {
-      "title": "Contracts",
+      "title": "Contracts & Tenders",
       "transformation": {
         "fields": [
           "source",
@@ -53,4 +53,3 @@
     }
   }
 }
-
