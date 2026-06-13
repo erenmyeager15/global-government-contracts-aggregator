@@ -21,6 +21,15 @@ function withoutUrls(value: string | null): string | null {
   return normalizeText(value?.replace(/(?:https?:\/\/|www\.)\S+/gi, ' '));
 }
 
+function redactSensitiveText(value: string | null): string | null {
+  if (!value) return null;
+  return normalizeText(
+    value
+      .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[redacted email]')
+      .replace(/(?<![\w-])(?:\+?\d[\d\s().-]{9,13}\d)(?![\w-])/g, '[redacted phone]'),
+  );
+}
+
 function asArray(value: unknown): unknown[] {
   if (Array.isArray(value)) return value;
   if (value === null || value === undefined) return [];
@@ -87,6 +96,11 @@ function numberOrNull(value: unknown): number | null {
   if (!text) return null;
   const parsed = Number(text);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function contractValueOrNull(value: unknown): number | null {
+  const amount = numberOrNull(value);
+  return amount !== null && amount > 1 ? amount : null;
 }
 
 function compactCodes(...values: unknown[]): string[] {
@@ -166,7 +180,11 @@ function normalizeUkRelease(release: UkOcdsRelease, keyword: string | null): Con
   if (!title || !contractId) return null;
 
   const buyer = release.parties?.find((party) => party.roles?.includes('buyer'));
-  const address = buyer?.address ?? tender?.items?.[0]?.deliveryAddresses?.[0];
+  const buyerAddress = buyer?.address;
+  const deliveryAddress = tender?.items?.flatMap((item) => item.deliveryAddresses ?? [])[0];
+  // Derive country and region from the SAME address (prefer the buyer's, fall back to delivery)
+  // so the pair is always consistent instead of mixing buyer country with delivery region.
+  const locationAddress = buyerAddress?.countryName ? buyerAddress : (deliveryAddress ?? buyerAddress);
   const classification = tender?.classification;
   const publishedDate = normalizeDateTime(tender?.datePublished ?? release.date);
 
@@ -176,13 +194,13 @@ function normalizeUkRelease(release: UkOcdsRelease, keyword: string | null): Con
     contractId,
     title,
     buyerName: normalizeText(buyer?.name),
-    buyerCountry: normalizeText(address?.countryName),
-    buyerRegion: normalizeText(address?.region ?? address?.locality),
+    buyerCountry: normalizeText(locationAddress?.countryName),
+    buyerRegion: normalizeText(locationAddress?.region ?? locationAddress?.locality),
     noticeType: release.tag?.join(', ') ?? null,
     stage: 'tender',
     procurementMethod: normalizeText(tender?.procurementMethodDetails ?? tender?.procurementMethod),
-    contractValue: numberOrNull(tender?.value?.amount),
-    currency: normalizeText(tender?.value?.currency),
+    contractValue: contractValueOrNull(tender?.value?.amount),
+    currency: contractValueOrNull(tender?.value?.amount) === null ? null : normalizeText(tender?.value?.currency),
     publishedDate,
     deadlineDate: normalizeDateTime(tender?.tenderPeriod?.endDate, publishedDate),
     status: normalizeText(tender?.status),
@@ -190,7 +208,7 @@ function normalizeUkRelease(release: UkOcdsRelease, keyword: string | null): Con
       classification ? `${classification.scheme ?? 'CPV'}:${classification.id ?? ''} ${classification.description ?? ''}` : null,
       ...(tender?.additionalClassifications ?? []).map((item) => `${item.scheme ?? 'CPV'}:${item.id ?? ''} ${item.description ?? ''}`),
     ),
-    description: normalizeText(tender?.description),
+    description: redactSensitiveText(normalizeText(tender?.description)),
     contractUrl: contractId ? `https://www.contractsfinder.service.gov.uk/Notice/${release.id ?? contractId}` : null,
     scrapedAt: new Date().toISOString(),
   };
@@ -198,17 +216,27 @@ function normalizeUkRelease(release: UkOcdsRelease, keyword: string | null): Con
 
 async function scrapeUk(input: NormalizedInput, keyword: string | null, remaining: () => number): Promise<ContractRecord[]> {
   const records: ContractRecord[] = [];
-  const url = new URL('https://www.contractsfinder.service.gov.uk/Published/Notices/OCDS/Search');
-  url.searchParams.set('publishedFrom', input.dateFrom);
-  url.searchParams.set('publishedTo', input.dateTo);
-  url.searchParams.set('stages', 'tender');
-  url.searchParams.set('limit', String(Math.min(Math.max(input.maxResults * 5, 100), 1000)));
+  const firstUrl = new URL('https://www.contractsfinder.service.gov.uk/Published/Notices/OCDS/Search');
+  firstUrl.searchParams.set('publishedFrom', input.dateFrom);
+  firstUrl.searchParams.set('publishedTo', input.dateTo);
+  firstUrl.searchParams.set('stages', 'tender');
+  firstUrl.searchParams.set('limit', '100');
 
-  const data = await fetchJson<{ releases?: UkOcdsRelease[] }>(url.toString());
-  for (const release of data.releases ?? []) {
-    if (records.length >= remaining()) break;
-    const record = normalizeUkRelease(release, keyword);
-    if (record && matchesFilters(record, keyword, input.country)) records.push(record);
+  let nextUrl: string | null = firstUrl.toString();
+  const visited = new Set<string>();
+
+  for (let page = 1; page <= 100 && nextUrl && records.length < remaining(); page += 1) {
+    if (visited.has(nextUrl)) break;
+    visited.add(nextUrl);
+    const data: { releases?: UkOcdsRelease[]; links?: { next?: string } } = await fetchJson(nextUrl);
+
+    for (const release of data.releases ?? []) {
+      if (records.length >= remaining()) break;
+      const record = normalizeUkRelease(release, keyword);
+      if (record && matchesFilters(record, keyword, input.country)) records.push(record);
+    }
+
+    nextUrl = normalizeText(data.links?.next);
   }
   return records;
 }
@@ -283,7 +311,7 @@ function normalizeTedNotice(notice: TedNotice, keyword: string | null): Contract
     deadlineDate,
     status,
     classificationCodes: compactCodes(notice['classification-cpv']),
-    description: preferredText(notice['description-proc']),
+    description: redactSensitiveText(preferredText(notice['description-proc'])),
     contractUrl: htmlUrl,
     scrapedAt: new Date().toISOString(),
   };
@@ -371,7 +399,7 @@ function normalizeSamOpportunity(item: SamOpportunity, keyword: string | null): 
     deadlineDate: normalizeText(item.responseDeadLine ?? item.archiveDate),
     status: normalizeText(item.active === 'Yes' ? 'active' : item.active),
     classificationCodes: compactCodes(item.naicsCode ? `NAICS:${item.naicsCode}` : null, item.classificationCode ? `PSC:${item.classificationCode}` : null),
-    description: normalizeText(item.description),
+    description: redactSensitiveText(normalizeText(item.description)),
     contractUrl: normalizeText(item.uiLink) ?? (contractId ? `https://sam.gov/opp/${contractId}/view` : null),
     scrapedAt: new Date().toISOString(),
   };
