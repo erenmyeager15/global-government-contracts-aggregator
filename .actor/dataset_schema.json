@@ -1,0 +1,56 @@
+{
+  "actorSpecification": 1,
+  "views": {
+    "contracts": {
+      "title": "Contracts",
+      "transformation": {
+        "fields": [
+          "source",
+          "keyword",
+          "contractId",
+          "title",
+          "buyerName",
+          "buyerCountry",
+          "buyerRegion",
+          "noticeType",
+          "stage",
+          "procurementMethod",
+          "contractValue",
+          "currency",
+          "publishedDate",
+          "deadlineDate",
+          "status",
+          "classificationCodes",
+          "description",
+          "contractUrl",
+          "scrapedAt"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "source": { "label": "Source", "format": "text" },
+          "keyword": { "label": "Keyword", "format": "text" },
+          "contractId": { "label": "Contract ID", "format": "text" },
+          "title": { "label": "Title", "format": "text" },
+          "buyerName": { "label": "Buyer", "format": "text" },
+          "buyerCountry": { "label": "Country", "format": "text" },
+          "buyerRegion": { "label": "Region", "format": "text" },
+          "noticeType": { "label": "Notice Type", "format": "text" },
+          "stage": { "label": "Stage", "format": "text" },
+          "procurementMethod": { "label": "Method", "format": "text" },
+          "contractValue": { "label": "Value", "format": "number" },
+          "currency": { "label": "Currency", "format": "text" },
+          "publishedDate": { "label": "Published", "format": "date" },
+          "deadlineDate": { "label": "Deadline", "format": "date" },
+          "status": { "label": "Status", "format": "text" },
+          "classificationCodes": { "label": "Codes", "format": "array" },
+          "description": { "label": "Description", "format": "text" },
+          "contractUrl": { "label": "URL", "format": "link" },
+          "scrapedAt": { "label": "Scraped At", "format": "date" }
+        }
+      }
+    }
+  }
+}
+

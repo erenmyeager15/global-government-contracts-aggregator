@@ -1,0 +1,12 @@
+{
+  "sources": ["uk_contracts_finder", "ted"],
+  "keywords": ["software"],
+  "dateFrom": "2026-06-01",
+  "dateTo": "2026-06-13",
+  "noticeStatus": "active",
+  "maxResults": 10,
+  "proxyConfiguration": {
+    "useApifyProxy": false
+  }
+}
+

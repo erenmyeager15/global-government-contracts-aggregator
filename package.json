@@ -1,0 +1,24 @@
+{
+  "name": "global-government-contracts-aggregator",
+  "version": "1.0.0",
+  "description": "Apify Actor for official government contract and tender data from SAM.gov, TED, and UK Contracts Finder.",
+  "main": "dist/main.js",
+  "type": "module",
+  "scripts": {
+    "start": "node dist/main.js",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "apify": "^3.2.5"
+  },
+  "devDependencies": {
+    "@apify/tsconfig": "^0.1.0",
+    "@types/node": "^20.17.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
+

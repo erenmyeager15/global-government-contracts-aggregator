@@ -1,0 +1,34 @@
+{
+  "actorSpecification": 1,
+  "name": "global-government-contracts-aggregator",
+  "title": "Global Government Contracts Scraper - SAM.gov, TED & UK Tenders",
+  "description": "Scrape public government contracts and tender notices from official sources: SAM.gov, EU TED, and UK Contracts Finder. Export normalized B2B procurement opportunity data.",
+  "version": "1.0",
+  "dockerfile": "Dockerfile",
+  "input": "../INPUT_SCHEMA.json",
+  "readme": "../README.md",
+  "categories": ["LEAD_GENERATION", "AUTOMATION", "OTHER"],
+  "pricingInfo": {
+    "pricingModel": "PAY_PER_EVENT",
+    "pricingPerEvent": {
+      "actorChargeEvents": {
+        "contract-scraped": {
+          "eventTitle": "Contract scraped",
+          "eventDescription": "Charged once for each clean public government contract or tender record saved to the dataset.",
+          "eventPriceUsd": 0.004,
+          "isPrimaryEvent": true,
+          "isOneTimeEvent": false
+        }
+      }
+    }
+  },
+  "storages": {
+    "dataset": "./dataset_schema.json"
+  },
+  "defaultRunOptions": {
+    "build": "latest",
+    "memoryMbytes": 1024,
+    "timeoutSecs": 14400
+  }
+}
+
