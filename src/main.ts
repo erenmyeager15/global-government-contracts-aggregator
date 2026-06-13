@@ -227,6 +227,25 @@ function tedValue(notice: TedNotice): { amount: number | null; currency: string 
   };
 }
 
+function tedStage(notice: TedNotice): string {
+  const formType = preferredText(notice['form-type']);
+  if (formType === 'competition') return 'tender';
+  if (formType === 'result') return 'award';
+  if (formType === 'cont-modif') return 'contract_modification';
+  return formType ?? 'notice';
+}
+
+function tedStatus(notice: TedNotice, stage: string, deadlineDate: string | null): string {
+  if (stage === 'award') return 'awarded';
+  if (stage === 'contract_modification') return 'modified';
+
+  const terminationValue = notice['competition-termination-proc'];
+  const termination = preferredText(terminationValue)?.toLowerCase();
+  if (terminationValue === true || (termination && !['false', '0', 'no'].includes(termination))) return 'cancelled';
+  if (!deadlineDate) return 'unknown';
+  return new Date(deadlineDate).getTime() >= Date.now() ? 'active' : 'closed';
+}
+
 function normalizeTedNotice(notice: TedNotice, keyword: string | null): ContractRecord | null {
   const title = preferredText(notice['notice-title']);
   const contractId = normalizeText(notice['publication-number']);
@@ -238,7 +257,8 @@ function normalizeTedNotice(notice: TedNotice, keyword: string | null): Contract
     preferredText(notice['deadline-receipt-tender-date-lot'] ?? notice['deadline-receipt-request-date-lot']),
     publishedDate,
   );
-  const status = deadlineDate ? (new Date(deadlineDate).getTime() >= Date.now() ? 'active' : 'closed') : null;
+  const stage = tedStage(notice);
+  const status = tedStatus(notice, stage, deadlineDate);
 
   return {
     source: 'ted',
@@ -248,8 +268,10 @@ function normalizeTedNotice(notice: TedNotice, keyword: string | null): Contract
     buyerName: preferredText(notice['buyer-name']),
     buyerCountry: preferredText(notice['buyer-country'] ?? notice['place-of-performance-country']),
     buyerRegion: null,
-    noticeType: preferredText(notice['contract-nature']),
-    stage: 'tender',
+    noticeType: preferredText(notice['notice-type'])
+      ?? preferredText(notice['notice-subtype'])
+      ?? preferredText(notice['contract-nature']),
+    stage,
     procurementMethod: preferredText(notice['procedure-type']),
     contractValue: value.amount,
     currency: value.currency,
@@ -267,6 +289,10 @@ async function scrapeTed(input: NormalizedInput, keyword: string | null, remaini
   const fields = [
     'publication-number',
     'notice-title',
+    'form-type',
+    'notice-type',
+    'notice-subtype',
+    'competition-termination-proc',
     'buyer-name',
     'buyer-country',
     'publication-date',
@@ -298,7 +324,7 @@ async function scrapeTed(input: NormalizedInput, keyword: string | null, remaini
   for (const notice of data.notices ?? []) {
     if (records.length >= remaining()) break;
     const record = normalizeTedNotice(notice, keyword);
-    if (input.noticeStatus === 'active' && record?.status === 'closed') continue;
+    if (input.noticeStatus === 'active' && (record?.stage !== 'tender' || record.status !== 'active')) continue;
     if (record && matchesFilters(record, keyword, input.country)) records.push(record);
   }
   return records;

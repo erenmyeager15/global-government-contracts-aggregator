@@ -70,6 +70,10 @@ export interface UkOcdsRelease {
 export interface TedNotice {
   'publication-number'?: string;
   'notice-title'?: Record<string, string[] | string> | string;
+  'form-type'?: string[] | string;
+  'notice-type'?: string[] | string;
+  'notice-subtype'?: string[] | string;
+  'competition-termination-proc'?: boolean | string[] | string;
   'buyer-name'?: Record<string, string[] | string> | string[];
   'buyer-country'?: string[] | string;
   'publication-date'?: string;
