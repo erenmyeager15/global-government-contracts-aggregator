@@ -17,6 +17,10 @@ function normalizeText(value: unknown): string | null {
   return text || null;
 }
 
+function withoutUrls(value: string | null): string | null {
+  return normalizeText(value?.replace(/(?:https?:\/\/|www\.)\S+/gi, ' '));
+}
+
 function asArray(value: unknown): unknown[] {
   if (Array.isArray(value)) return value;
   if (value === null || value === undefined) return [];
@@ -123,7 +127,7 @@ function matchesFilters(record: ContractRecord, keyword: string | null, country:
     record.noticeType,
     record.stage,
     record.procurementMethod,
-    record.description,
+    withoutUrls(record.description),
     ...record.classificationCodes,
   ].filter(Boolean).join(' ').toLowerCase();
 
@@ -308,24 +312,32 @@ async function scrapeTed(input: NormalizedInput, keyword: string | null, remaini
     'classification-cpv',
   ];
   const from = input.dateFrom.replace(/-/g, '');
-  const body = {
-    query: `publication-date >= ${from} AND publication-date <= ${input.dateTo.replace(/-/g, '')}`,
-    page: 1,
-    limit: Math.min(Math.max(input.maxResults * 5, 100), 250),
-    fields,
-  };
-  const data = await fetchJson<{ notices?: TedNotice[] }>('https://api.ted.europa.eu/v3/notices/search', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-
   const records: ContractRecord[] = [];
-  for (const notice of data.notices ?? []) {
-    if (records.length >= remaining()) break;
-    const record = normalizeTedNotice(notice, keyword);
-    if (input.noticeStatus === 'active' && (record?.stage !== 'tender' || record.status !== 'active')) continue;
-    if (record && matchesFilters(record, keyword, input.country)) records.push(record);
+  const pageSize = 250;
+  const maxPages = 20;
+
+  for (let page = 1; page <= maxPages && records.length < remaining(); page += 1) {
+    const body = {
+      query: `publication-date >= ${from} AND publication-date <= ${input.dateTo.replace(/-/g, '')}`,
+      page,
+      limit: pageSize,
+      fields,
+    };
+    const data = await fetchJson<{ notices?: TedNotice[] }>('https://api.ted.europa.eu/v3/notices/search', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const notices = data.notices ?? [];
+
+    for (const notice of notices) {
+      if (records.length >= remaining()) break;
+      const record = normalizeTedNotice(notice, keyword);
+      if (input.noticeStatus === 'active' && (record?.stage !== 'tender' || record.status !== 'active')) continue;
+      if (record && matchesFilters(record, keyword, input.country)) records.push(record);
+    }
+
+    if (notices.length < pageSize) break;
   }
   return records;
 }
