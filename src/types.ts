@@ -78,7 +78,9 @@ export interface TedNotice {
   'procedure-type'?: string[] | string;
   'contract-nature'?: string[] | string;
   'estimated-value-proc'?: { value?: number | string; currency?: string } | number | string;
+  'estimated-value-cur-proc'?: string[] | string;
   'estimated-value-lot'?: Array<{ value?: number | string; currency?: string }> | { value?: number | string; currency?: string };
+  'estimated-value-cur-lot'?: string[] | string;
   'description-proc'?: Record<string, string[] | string> | string;
   'place-of-performance-country'?: string[] | string;
   'classification-cpv'?: string[] | string;
@@ -105,4 +107,3 @@ export interface SamOpportunity {
   uiLink?: string;
   description?: string;
 }
-

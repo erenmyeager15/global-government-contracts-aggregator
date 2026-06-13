@@ -42,6 +42,41 @@ function firstText(value: unknown): string | null {
   return null;
 }
 
+function preferredText(value: unknown): string | null {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const translations = value as Record<string, unknown>;
+    for (const language of ['eng', 'en', 'ENG']) {
+      const text = firstText(translations[language]);
+      if (text) return text;
+    }
+  }
+  return firstText(value);
+}
+
+function normalizeDateTime(value: unknown, referenceValue?: unknown): string | null {
+  const text = normalizeText(value);
+  if (!text) return null;
+
+  let candidate = text;
+  const dateOnly = text.match(/^(\d{4}-\d{2}-\d{2})(Z|[+-]\d{2}:\d{2})?$/);
+  if (dateOnly) candidate = `${dateOnly[1]}T00:00:00.000Z`;
+
+  const parsed = new Date(candidate);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  const reference = referenceValue ? normalizeDateTime(referenceValue) : null;
+  if (reference) {
+    const referenceDate = new Date(reference);
+    if (parsed.getUTCFullYear() < referenceDate.getUTCFullYear() - 1) {
+      const repaired = candidate.replace(/^\d{4}/, String(referenceDate.getUTCFullYear()));
+      const repairedDate = new Date(repaired);
+      if (!Number.isNaN(repairedDate.getTime()) && repairedDate >= referenceDate) return repairedDate.toISOString();
+    }
+  }
+
+  return parsed.toISOString();
+}
+
 function numberOrNull(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   const text = normalizeText(value)?.replace(/,/g, '');
@@ -129,6 +164,7 @@ function normalizeUkRelease(release: UkOcdsRelease, keyword: string | null): Con
   const buyer = release.parties?.find((party) => party.roles?.includes('buyer'));
   const address = buyer?.address ?? tender?.items?.[0]?.deliveryAddresses?.[0];
   const classification = tender?.classification;
+  const publishedDate = normalizeDateTime(tender?.datePublished ?? release.date);
 
   return {
     source: 'uk_contracts_finder',
@@ -143,8 +179,8 @@ function normalizeUkRelease(release: UkOcdsRelease, keyword: string | null): Con
     procurementMethod: normalizeText(tender?.procurementMethodDetails ?? tender?.procurementMethod),
     contractValue: numberOrNull(tender?.value?.amount),
     currency: normalizeText(tender?.value?.currency),
-    publishedDate: normalizeText(tender?.datePublished ?? release.date),
-    deadlineDate: normalizeText(tender?.tenderPeriod?.endDate),
+    publishedDate,
+    deadlineDate: normalizeDateTime(tender?.tenderPeriod?.endDate, publishedDate),
     status: normalizeText(tender?.status),
     classificationCodes: compactCodes(
       classification ? `${classification.scheme ?? 'CPV'}:${classification.id ?? ''} ${classification.description ?? ''}` : null,
@@ -179,35 +215,49 @@ function tedValue(notice: TedNotice): { amount: number | null; currency: string 
     return { amount: numberOrNull(procValue.value), currency: normalizeText(procValue.currency) };
   }
   const lotValue = asArray(notice['estimated-value-lot'])[0] as { value?: unknown; currency?: unknown } | undefined;
-  if (lotValue && typeof lotValue === 'object') return { amount: numberOrNull(lotValue.value), currency: normalizeText(lotValue.currency) };
-  return { amount: numberOrNull(procValue), currency: null };
+  if (lotValue && typeof lotValue === 'object') {
+    return {
+      amount: numberOrNull(lotValue.value),
+      currency: normalizeText(lotValue.currency) ?? firstText(notice['estimated-value-cur-lot']),
+    };
+  }
+  return {
+    amount: numberOrNull(procValue ?? notice['estimated-value-lot']),
+    currency: firstText(notice['estimated-value-cur-proc'] ?? notice['estimated-value-cur-lot']),
+  };
 }
 
 function normalizeTedNotice(notice: TedNotice, keyword: string | null): ContractRecord | null {
-  const title = firstText(notice['notice-title']);
+  const title = preferredText(notice['notice-title']);
   const contractId = normalizeText(notice['publication-number']);
   if (!title || !contractId) return null;
   const value = tedValue(notice);
   const htmlUrl = `https://ted.europa.eu/en/notice/-/detail/${contractId}`;
+  const publishedDate = normalizeDateTime(notice['publication-date']);
+  const deadlineDate = normalizeDateTime(
+    preferredText(notice['deadline-receipt-tender-date-lot'] ?? notice['deadline-receipt-request-date-lot']),
+    publishedDate,
+  );
+  const status = deadlineDate ? (new Date(deadlineDate).getTime() >= Date.now() ? 'active' : 'closed') : null;
 
   return {
     source: 'ted',
     keyword,
     contractId,
     title,
-    buyerName: firstText(notice['buyer-name']),
-    buyerCountry: firstText(notice['buyer-country'] ?? notice['place-of-performance-country']),
+    buyerName: preferredText(notice['buyer-name']),
+    buyerCountry: preferredText(notice['buyer-country'] ?? notice['place-of-performance-country']),
     buyerRegion: null,
-    noticeType: firstText(notice['contract-nature']),
+    noticeType: preferredText(notice['contract-nature']),
     stage: 'tender',
-    procurementMethod: firstText(notice['procedure-type']),
+    procurementMethod: preferredText(notice['procedure-type']),
     contractValue: value.amount,
     currency: value.currency,
-    publishedDate: normalizeText(notice['publication-date']),
-    deadlineDate: firstText(notice['deadline-receipt-tender-date-lot'] ?? notice['deadline-receipt-request-date-lot']),
-    status: null,
+    publishedDate,
+    deadlineDate,
+    status,
     classificationCodes: compactCodes(notice['classification-cpv']),
-    description: firstText(notice['description-proc']),
+    description: preferredText(notice['description-proc']),
     contractUrl: htmlUrl,
     scrapedAt: new Date().toISOString(),
   };
@@ -225,13 +275,15 @@ async function scrapeTed(input: NormalizedInput, keyword: string | null, remaini
     'procedure-type',
     'contract-nature',
     'estimated-value-proc',
+    'estimated-value-cur-proc',
     'estimated-value-lot',
+    'estimated-value-cur-lot',
     'description-proc',
     'classification-cpv',
   ];
   const from = input.dateFrom.replace(/-/g, '');
   const body = {
-    query: `publication-date >= ${from}`,
+    query: `publication-date >= ${from} AND publication-date <= ${input.dateTo.replace(/-/g, '')}`,
     page: 1,
     limit: Math.min(Math.max(input.maxResults * 5, 100), 250),
     fields,
@@ -246,6 +298,7 @@ async function scrapeTed(input: NormalizedInput, keyword: string | null, remaini
   for (const notice of data.notices ?? []) {
     if (records.length >= remaining()) break;
     const record = normalizeTedNotice(notice, keyword);
+    if (input.noticeStatus === 'active' && record?.status === 'closed') continue;
     if (record && matchesFilters(record, keyword, input.country)) records.push(record);
   }
   return records;
