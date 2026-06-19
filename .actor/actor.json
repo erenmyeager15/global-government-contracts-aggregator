@@ -2,7 +2,7 @@
   "actorSpecification": 1,
   "name": "global-government-contracts-aggregator",
   "title": "Global Government Contracts & Tenders Scraper",
-  "description": "Scrape public government contracts and tender notices from official sources: SAM.gov, EU TED, and UK Contracts Finder. Export normalized B2B procurement opportunity data.",
+  "description": "Search public procurement opportunities from official US, EU, and UK sources. Extract buyers, deadlines, values, categories, locations, and official tender URLs.",
   "version": "1.0",
   "dockerfile": "Dockerfile",
   "input": "../INPUT_SCHEMA.json",

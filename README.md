@@ -1,6 +1,6 @@
 # Global Government Contracts & Tenders Scraper
 
-Scrape official public procurement notices from government sources and export normalized contract opportunity data for B2B research, tender monitoring, procurement analytics, and vendor sales workflows.
+Search official public procurement opportunities from US, EU, and UK government sources in one normalized dataset. This Actor helps vendors, consultants, proposal teams, and researchers monitor public-sector contracts and tenders with clean fields for buyers, deadlines, values, categories, locations, and official source URLs.
 
 This Actor currently supports:
 
@@ -29,12 +29,14 @@ It saves clean records to the Apify Dataset and charges only after a valid contr
 - Official contract URL
 - Scraped timestamp
 
+The output is focused on public procurement records and organization-level opportunity data. It does not intentionally collect personal contact lists, private account data, or non-public information.
+
 ## Use Cases
 
-1. B2B lead generation for suppliers selling into government procurement.
-2. Tender monitoring for sales teams and bid managers.
-3. Public-sector market research by category, region, buyer, and value.
-4. Competitive intelligence for procurement consultants and vendors.
+1. Government contract and tender monitoring for vendors.
+2. Public-sector opportunity tracking for proposal and capture teams.
+3. Procurement market research by category, region, buyer, and value.
+4. Competitive intelligence for consultants and public-sector vendors.
 5. Contract analytics across the UK, EU, and US public-sector markets.
 
 ## Input

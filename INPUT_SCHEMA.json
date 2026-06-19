@@ -1,6 +1,6 @@
 {
   "title": "Global Government Contracts & Tenders Scraper Input",
-  "description": "Search official public procurement sources and export normalized contract/tender records.",
+  "description": "Search official public procurement sources and export normalized contract and tender opportunity records.",
   "type": "object",
   "schemaVersion": 1,
   "properties": {
@@ -57,11 +57,11 @@
     "maxResults": {
       "title": "Max results",
       "type": "integer",
-      "description": "Maximum total records saved across all selected sources and keywords.",
+      "description": "Maximum total records saved across all selected sources and keywords. Keep this low for quick tests.",
       "editor": "number",
       "minimum": 1,
       "maximum": 1000,
-      "default": 50,
+      "default": 10,
       "unit": "records"
     },
     "samApiKey": {
