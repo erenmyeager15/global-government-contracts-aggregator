@@ -1,45 +1,48 @@
 # Global Government Contracts & Tenders Scraper
 
-Search official public procurement opportunities from US, EU, and UK government sources in one normalized dataset. This Actor helps vendors, consultants, proposal teams, and researchers monitor public-sector contracts and tenders with clean fields for buyers, deadlines, values, categories, locations, and official source URLs.
+Search official public procurement opportunities from UK, EU, and US government sources in one normalized dataset. This Actor helps vendors, consultants, capture teams, proposal teams, and market researchers monitor public-sector contracts and tenders with clean fields for buyers, deadlines, values, categories, locations, statuses, and official source URLs.
 
-This Actor currently supports:
+Use it to build a repeatable government-contract lead feed, compare procurement markets by region or category, or export tenders into spreadsheets, CRMs, dashboards, and research workflows.
 
-- **UK Contracts Finder** via the official OCDS API
-- **EU TED** via the official TED Search API
-- **SAM.gov** via the official Get Opportunities Public API when you provide your own SAM.gov API key
+## Supported Sources
 
-It atomically saves and charges each clean contract/tender record, skips duplicates, and stops later sources and keywords when the user's spending limit is reached.
+| Source | Coverage | API key required | Notes |
+| --- | --- | --- | --- |
+| UK Contracts Finder | UK public-sector tenders and notices | No | Uses the official OCDS API. |
+| EU TED | EU public procurement notices | No | Uses the official TED Search API. |
+| SAM.gov | US federal opportunities | Yes | Requires your own SAM.gov public API key. |
+
+The default input searches **UK Contracts Finder** and **EU TED**. Add `sam_gov` only when you have a SAM.gov API key.
 
 ## What This Actor Extracts
 
-- Source
-- Keyword used
-- Contract or tender ID
-- Contract title
+- Source name and keyword used
+- Contract, tender, notice, or opportunity ID
+- Contract title and description
 - Buyer / contracting authority
-- Country and region
-- Notice type and stage
-- Procurement method
+- Buyer country and region
+- Notice type, stage, and procurement method
 - Contract value and currency where available
-- Published date
-- Deadline date
-- Status
-- CPV, NAICS, or classification codes
-- Description
-- Official contract URL
+- Published date and deadline date
+- Status such as active, closed, awarded, modified, or cancelled
+- CPV, NAICS, PSC, or other classification codes
+- Official contract or tender URL
 - Scraped timestamp
 
-The output is focused on public procurement records and organization-level opportunity data. It does not intentionally collect personal contact lists, private account data, or non-public information.
+The output is focused on official public procurement records and organization-level opportunity data. The Actor redacts email addresses and phone numbers from descriptions and does not intentionally collect personal contact lists, private account data, or non-public information.
 
 ## Use Cases
 
-1. Government contract and tender monitoring for vendors.
-2. Public-sector opportunity tracking for proposal and capture teams.
-3. Procurement market research by category, region, buyer, and value.
-4. Competitive intelligence for consultants and public-sector vendors.
-5. Contract analytics across the UK, EU, and US public-sector markets.
+- Monitor new government contracts and tenders by keyword.
+- Build public-sector opportunity feeds for vendors and consultants.
+- Track deadlines for proposal, bid, capture, and sales teams.
+- Research procurement demand by country, buyer, category, value, and status.
+- Feed dashboards, spreadsheets, CRMs, or internal lead-scoring workflows.
+- Compare UK, EU, and US procurement markets in one normalized export.
 
-## Input
+## Quick Start
+
+Use this small input for a first run without any API key:
 
 ```json
 {
@@ -52,7 +55,18 @@ The output is focused on public procurement records and organization-level oppor
 }
 ```
 
-To include SAM.gov, add `"sam_gov"` to `sources` and provide `samApiKey`.
+To search recent tenders from the default sources, you can also leave `keywords` empty:
+
+```json
+{
+  "sources": ["uk_contracts_finder", "ted"],
+  "keywords": [],
+  "noticeStatus": "active",
+  "maxResults": 20
+}
+```
+
+To include SAM.gov, add `"sam_gov"` to `sources` and provide `samApiKey`:
 
 ```json
 {
@@ -65,6 +79,33 @@ To include SAM.gov, add `"sam_gov"` to `sources` and provide `samApiKey`.
   "maxResults": 25
 }
 ```
+
+## Input Fields
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `sources` | array | `["uk_contracts_finder", "ted"]` | Official procurement sources to search. SAM.gov requires `samApiKey`. |
+| `keywords` | string array | `["software"]` | Optional search terms. Leave empty to return recent tenders from selected sources. |
+| `dateFrom` | string | 30 days ago | Publication start date in `YYYY-MM-DD` format. |
+| `dateTo` | string | today | Publication end date in `YYYY-MM-DD` format. |
+| `country` | string | empty | Optional country/region text filter. For SAM.gov, use a US state code such as `CA` or `NY`. |
+| `noticeStatus` | `active`, `all` | `active` | Target active/open opportunities where supported, or include all available notices. |
+| `maxResults` | integer | `10` | Maximum total records saved across all selected sources and keywords. |
+| `samApiKey` | string | empty | SAM.gov public API key, required only when `sam_gov` is selected. |
+| `proxyConfiguration` | object | no proxy | Usually not needed for official APIs, but available for enterprise network routing. |
+
+## Output Overview
+
+Each dataset item represents one normalized public procurement record.
+
+| Field group | Important fields |
+| --- | --- |
+| Source context | `source`, `keyword`, `scrapedAt` |
+| Opportunity identity | `contractId`, `title`, `noticeType`, `stage`, `status`, `contractUrl` |
+| Buyer and location | `buyerName`, `buyerCountry`, `buyerRegion` |
+| Tender timing | `publishedDate`, `deadlineDate` |
+| Commercial detail | `contractValue`, `currency`, `procurementMethod`, `classificationCodes` |
+| Description | `description` with email and phone-like text redacted where detected |
 
 ## Output Example
 
@@ -97,6 +138,23 @@ To include SAM.gov, add `"sam_gov"` to `sources` and provide `samApiKey`.
 | Event | Price | When charged |
 | --- | ---: | --- |
 | `contract-scraped` | `$0.004` | Once per clean contract/tender record saved |
+
+Records are saved and charged atomically with `contract-scraped`. The Actor skips duplicate source IDs and stops later sources/keywords when the user's spending limit is reached.
+
+## Tips For Better Results
+
+- Start with `maxResults: 10` to check the output before scaling.
+- Use focused keywords such as `cybersecurity`, `software`, `facilities management`, or `medical equipment`.
+- Leave `keywords` empty when you want a broad recent-opportunity feed.
+- Keep `noticeStatus` as `active` for open opportunities and switch to `all` for market research.
+- Use SAM.gov only when you have a valid public API key from SAM.gov.
+
+## Known Limits
+
+- Source APIs can differ in how they expose values, deadlines, locations, and classifications.
+- Some notices do not publish contract values or exact deadlines.
+- SAM.gov data is skipped when `sam_gov` is selected without `samApiKey`.
+- Country filtering is a text filter for UK/TED and a US state-code filter for SAM.gov.
 
 ## Responsible Use
 
