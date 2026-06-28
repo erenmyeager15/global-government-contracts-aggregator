@@ -8,7 +8,7 @@ This Actor currently supports:
 - **EU TED** via the official TED Search API
 - **SAM.gov** via the official Get Opportunities Public API when you provide your own SAM.gov API key
 
-It saves clean records to the Apify Dataset and charges only after a valid contract/tender record is saved.
+It atomically saves and charges each clean contract/tender record, skips duplicates, and stops later sources and keywords when the user's spending limit is reached.
 
 ## What This Actor Extracts
 

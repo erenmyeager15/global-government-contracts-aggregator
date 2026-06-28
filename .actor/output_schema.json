@@ -1,0 +1,14 @@
+{
+  "actorOutputSchemaVersion": 1,
+  "title": "Global Government Contracts & Tenders Scraper Output",
+  "description": "Structured public procurement opportunity records from official US, EU, and UK sources with source names, keywords, contract IDs, titles, buyers, locations, notice types, stages, procurement methods, values, currencies, published dates, deadlines, statuses, classification codes, descriptions, official URLs, and scraped timestamps.",
+  "type": "object",
+  "properties": {
+    "results": {
+      "type": "string",
+      "title": "Government contract and tender records",
+      "description": "Clean dataset items containing official public procurement opportunity, buyer, deadline, value, status, classification, description, and source URL data.",
+      "template": "{{links.apiDefaultDatasetUrl}}/items"
+    }
+  }
+}

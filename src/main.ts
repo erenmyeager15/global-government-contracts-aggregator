@@ -127,7 +127,7 @@ function normalizeInput(input: ActorInput | null): NormalizedInput {
     dateTo: input?.dateTo || isoDate(new Date()),
     country: normalizeText(input?.country),
     noticeStatus: input?.noticeStatus ?? 'active',
-    maxResults: Math.min(Math.max(input?.maxResults ?? 50, 1), 1000),
+    maxResults: Math.min(Math.max(input?.maxResults ?? 10, 1), 1000),
     samApiKey: normalizeText(input?.samApiKey),
   };
 }
@@ -431,18 +431,27 @@ async function scrapeSam(input: NormalizedInput, keyword: string | null, remaini
   return records;
 }
 
-async function pushUnique(records: ContractRecord[], seen: Set<string>, remaining: () => number): Promise<number> {
+async function pushUnique(
+  records: ContractRecord[],
+  seen: Set<string>,
+  remaining: () => number,
+): Promise<{ saved: number; stopped: boolean }> {
   let saved = 0;
   for (const record of records) {
     if (remaining() <= 0) break;
     const key = `${record.source}:${record.contractId}`;
     if (seen.has(key)) continue;
-    seen.add(key);
-    await Actor.pushData(record);
-    await Actor.charge({ eventName: CONTRACT_EVENT });
-    saved += 1;
+
+    const chargeResult = await Actor.pushData(record, CONTRACT_EVENT);
+    const recordWasSaved = chargeResult.chargedCount > 0 || !chargeResult.eventChargeLimitReached;
+    if (recordWasSaved) {
+      seen.add(key);
+      saved += 1;
+    }
+
+    if (chargeResult.eventChargeLimitReached) return { saved, stopped: true };
   }
-  return saved;
+  return { saved, stopped: false };
 }
 
 await Actor.init();
@@ -452,6 +461,7 @@ try {
   const keywords = input.keywords.length ? input.keywords : [null];
   const seen = new Set<string>();
   let savedCount = 0;
+  let stoppedByChargeLimit = false;
   const remaining = () => input.maxResults - savedCount;
 
   log.info('Starting global government contracts scrape', {
@@ -463,10 +473,10 @@ try {
   });
 
   for (const keyword of keywords) {
-    if (remaining() <= 0) break;
+    if (remaining() <= 0 || stoppedByChargeLimit) break;
 
     for (const source of input.sources) {
-      if (remaining() <= 0) break;
+      if (remaining() <= 0 || stoppedByChargeLimit) break;
       let records: ContractRecord[] = [];
 
       if (source === 'uk_contracts_finder') {
@@ -480,12 +490,23 @@ try {
         records = await scrapeSam(input, keyword, remaining);
       }
 
-      savedCount += await pushUnique(records, seen, remaining);
-      await new Promise((resolve) => setTimeout(resolve, 500 + Math.floor(Math.random() * 700)));
+      const pushResult = await pushUnique(records, seen, remaining);
+      savedCount += pushResult.saved;
+      stoppedByChargeLimit = pushResult.stopped;
+      if (!stoppedByChargeLimit) {
+        await new Promise((resolve) => setTimeout(resolve, 500 + Math.floor(Math.random() * 700)));
+      }
     }
   }
 
-  log.info('Government contracts scrape finished', { savedCount });
+  if (stoppedByChargeLimit) {
+    const message = `Stopped at the user's spending limit after ${savedCount} contract(s).`;
+    await Actor.setStatusMessage(message);
+    log.warning(message);
+  } else {
+    await Actor.setStatusMessage(`Finished with ${savedCount} unique contract(s).`);
+    log.info('Government contracts scrape finished', { savedCount });
+  }
 } catch (error) {
   log.exception(error as Error, 'Global government contracts actor failed');
   throw error;
