@@ -26,6 +26,7 @@ export interface NormalizedInput {
 export interface ContractRecord {
   source: 'uk_contracts_finder' | 'ted' | 'sam_gov';
   keyword: string | null;
+  recordKey: string;
   contractId: string;
   title: string;
   buyerName: string | null;
@@ -37,10 +38,13 @@ export interface ContractRecord {
   contractValue: number | null;
   currency: string | null;
   publishedDate: string | null;
+  lastModifiedDate: string | null;
   deadlineDate: string | null;
   status: string | null;
   classificationCodes: string[];
   description: string | null;
+  matchedFields: string[];
+  matchReason: string | null;
   contractUrl: string | null;
   scrapedAt: string;
 }
@@ -69,6 +73,8 @@ export interface UkOcdsRelease {
 
 export interface TedNotice {
   'publication-number'?: string;
+  'publication-date'?: string;
+  'change-procurement-documents-date'?: string[] | string;
   'notice-title'?: Record<string, string[] | string> | string;
   'form-type'?: string[] | string;
   'notice-type'?: string[] | string;
@@ -76,7 +82,6 @@ export interface TedNotice {
   'competition-termination-proc'?: boolean | string[] | string;
   'buyer-name'?: Record<string, string[] | string> | string[];
   'buyer-country'?: string[] | string;
-  'publication-date'?: string;
   'deadline-receipt-tender-date-lot'?: string[] | string;
   'deadline-receipt-request-date-lot'?: string[] | string;
   'procedure-type'?: string[] | string;

@@ -7,6 +7,7 @@
         "fields": [
           "source",
           "keyword",
+          "recordKey",
           "contractId",
           "title",
           "buyerName",
@@ -18,10 +19,13 @@
           "contractValue",
           "currency",
           "publishedDate",
+          "lastModifiedDate",
           "deadlineDate",
           "status",
           "classificationCodes",
           "description",
+          "matchedFields",
+          "matchReason",
           "contractUrl",
           "scrapedAt"
         ]
@@ -31,6 +35,7 @@
         "properties": {
           "source": { "label": "Source", "format": "text" },
           "keyword": { "label": "Keyword", "format": "text" },
+          "recordKey": { "label": "Record Key", "format": "text" },
           "contractId": { "label": "Contract ID", "format": "text" },
           "title": { "label": "Title", "format": "text" },
           "buyerName": { "label": "Buyer", "format": "text" },
@@ -42,10 +47,13 @@
           "contractValue": { "label": "Value", "format": "number" },
           "currency": { "label": "Currency", "format": "text" },
           "publishedDate": { "label": "Published", "format": "date" },
+          "lastModifiedDate": { "label": "Last Modified", "format": "date" },
           "deadlineDate": { "label": "Deadline", "format": "date" },
           "status": { "label": "Status", "format": "text" },
           "classificationCodes": { "label": "Codes", "format": "array" },
           "description": { "label": "Description", "format": "text" },
+          "matchedFields": { "label": "Matched Fields", "format": "array" },
+          "matchReason": { "label": "Match Reason", "format": "text" },
           "contractUrl": { "label": "URL", "format": "link" },
           "scrapedAt": { "label": "Scraped At", "format": "date" }
         }

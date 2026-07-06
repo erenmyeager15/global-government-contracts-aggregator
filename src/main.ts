@@ -1,5 +1,13 @@
 import { Actor, log } from 'apify';
 import type { ActorInput, ContractRecord, NormalizedInput, SamOpportunity, SourceName, TedNotice, UkOcdsRelease } from './types.js';
+import {
+  containsSearchText,
+  keywordMatch,
+  latestDateTime,
+  normalizeDateTime,
+  normalizeText,
+  stableRecordKey,
+} from './tender-utils.js';
 
 const DEFAULT_SOURCES: SourceName[] = ['uk_contracts_finder', 'ted'];
 const CONTRACT_EVENT = 'contract-scraped';
@@ -10,15 +18,6 @@ function isoDate(date: Date): string {
 
 function defaultDateFrom(): string {
   return isoDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
-}
-
-function normalizeText(value: unknown): string | null {
-  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
-  return text || null;
-}
-
-function withoutUrls(value: string | null): string | null {
-  return normalizeText(value?.replace(/(?:https?:\/\/|www\.)\S+/gi, ' '));
 }
 
 function redactSensitiveText(value: string | null): string | null {
@@ -66,30 +65,6 @@ function preferredText(value: unknown): string | null {
   return firstText(value);
 }
 
-function normalizeDateTime(value: unknown, referenceValue?: unknown): string | null {
-  const text = normalizeText(value);
-  if (!text) return null;
-
-  let candidate = text;
-  const dateOnly = text.match(/^(\d{4}-\d{2}-\d{2})(Z|[+-]\d{2}:\d{2})?$/);
-  if (dateOnly) candidate = `${dateOnly[1]}T00:00:00.000Z`;
-
-  const parsed = new Date(candidate);
-  if (Number.isNaN(parsed.getTime())) return null;
-
-  const reference = referenceValue ? normalizeDateTime(referenceValue) : null;
-  if (reference) {
-    const referenceDate = new Date(reference);
-    if (parsed.getUTCFullYear() < referenceDate.getUTCFullYear() - 1) {
-      const repaired = candidate.replace(/^\d{4}/, String(referenceDate.getUTCFullYear()));
-      const repairedDate = new Date(repaired);
-      if (!Number.isNaN(repairedDate.getTime()) && repairedDate >= referenceDate) return repairedDate.toISOString();
-    }
-  }
-
-  return parsed.toISOString();
-}
-
 function numberOrNull(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   const text = normalizeText(value)?.replace(/,/g, '');
@@ -133,20 +108,12 @@ function normalizeInput(input: ActorInput | null): NormalizedInput {
 }
 
 function matchesFilters(record: ContractRecord, keyword: string | null, country: string | null): boolean {
-  const haystack = [
-    record.title,
-    record.buyerName,
-    record.buyerCountry,
-    record.buyerRegion,
-    record.noticeType,
-    record.stage,
-    record.procurementMethod,
-    withoutUrls(record.description),
-    ...record.classificationCodes,
-  ].filter(Boolean).join(' ').toLowerCase();
+  const match = keywordMatch(record, keyword);
+  record.matchedFields = match.matchedFields;
+  record.matchReason = match.matchReason;
 
-  if (keyword && !haystack.includes(keyword.toLowerCase())) return false;
-  if (country && !haystack.includes(country.toLowerCase())) return false;
+  if (!match.matched) return false;
+  if (!containsSearchText(record, country)) return false;
   return true;
 }
 
@@ -187,10 +154,12 @@ function normalizeUkRelease(release: UkOcdsRelease, keyword: string | null): Con
   const locationAddress = buyerAddress?.countryName ? buyerAddress : (deliveryAddress ?? buyerAddress);
   const classification = tender?.classification;
   const publishedDate = normalizeDateTime(tender?.datePublished ?? release.date);
+  const lastModifiedDate = normalizeDateTime(release.date ?? tender?.datePublished);
 
   return {
     source: 'uk_contracts_finder',
     keyword,
+    recordKey: stableRecordKey('uk_contracts_finder', contractId),
     contractId,
     title,
     buyerName: normalizeText(buyer?.name),
@@ -202,13 +171,19 @@ function normalizeUkRelease(release: UkOcdsRelease, keyword: string | null): Con
     contractValue: contractValueOrNull(tender?.value?.amount),
     currency: contractValueOrNull(tender?.value?.amount) === null ? null : normalizeText(tender?.value?.currency),
     publishedDate,
-    deadlineDate: normalizeDateTime(tender?.tenderPeriod?.endDate, publishedDate),
+    lastModifiedDate,
+    deadlineDate: normalizeDateTime(tender?.tenderPeriod?.endDate, {
+      referenceValue: publishedDate,
+      dateOnlyAsEndOfDay: true,
+    }),
     status: normalizeText(tender?.status),
     classificationCodes: compactCodes(
       classification ? `${classification.scheme ?? 'CPV'}:${classification.id ?? ''} ${classification.description ?? ''}` : null,
       ...(tender?.additionalClassifications ?? []).map((item) => `${item.scheme ?? 'CPV'}:${item.id ?? ''} ${item.description ?? ''}`),
     ),
     description: redactSensitiveText(normalizeText(tender?.description)),
+    matchedFields: [],
+    matchReason: null,
     contractUrl: contractId ? `https://www.contractsfinder.service.gov.uk/Notice/${release.id ?? contractId}` : null,
     scrapedAt: new Date().toISOString(),
   };
@@ -287,14 +262,17 @@ function normalizeTedNotice(notice: TedNotice, keyword: string | null): Contract
   const publishedDate = normalizeDateTime(notice['publication-date']);
   const deadlineDate = normalizeDateTime(
     preferredText(notice['deadline-receipt-tender-date-lot'] ?? notice['deadline-receipt-request-date-lot']),
-    publishedDate,
+    { referenceValue: publishedDate, dateOnlyAsEndOfDay: true },
   );
+  const lastModifiedDate = latestDateTime(notice['change-procurement-documents-date'])
+    ?? normalizeDateTime(notice['publication-date']);
   const stage = tedStage(notice);
   const status = tedStatus(notice, stage, deadlineDate);
 
   return {
     source: 'ted',
     keyword,
+    recordKey: stableRecordKey('ted', contractId),
     contractId,
     title,
     buyerName: preferredText(notice['buyer-name']),
@@ -308,10 +286,13 @@ function normalizeTedNotice(notice: TedNotice, keyword: string | null): Contract
     contractValue: value.amount,
     currency: value.currency,
     publishedDate,
+    lastModifiedDate,
     deadlineDate,
     status,
     classificationCodes: compactCodes(notice['classification-cpv']),
     description: redactSensitiveText(preferredText(notice['description-proc'])),
+    matchedFields: [],
+    matchReason: null,
     contractUrl: htmlUrl,
     scrapedAt: new Date().toISOString(),
   };
@@ -328,6 +309,7 @@ async function scrapeTed(input: NormalizedInput, keyword: string | null, remaini
     'buyer-name',
     'buyer-country',
     'publication-date',
+    'change-procurement-documents-date',
     'deadline-receipt-tender-date-lot',
     'deadline-receipt-request-date-lot',
     'procedure-type',
@@ -385,6 +367,7 @@ function normalizeSamOpportunity(item: SamOpportunity, keyword: string | null): 
   return {
     source: 'sam_gov',
     keyword,
+    recordKey: stableRecordKey('sam_gov', contractId),
     contractId,
     title,
     buyerName: normalizeText(item.fullParentPathName ?? item.subTier ?? item.department),
@@ -395,11 +378,17 @@ function normalizeSamOpportunity(item: SamOpportunity, keyword: string | null): 
     procurementMethod: null,
     contractValue: awardAmount,
     currency: awardAmount !== null ? 'USD' : null,
-    publishedDate: normalizeText(item.postedDate),
-    deadlineDate: normalizeText(item.responseDeadLine ?? item.archiveDate),
+    publishedDate: normalizeDateTime(item.postedDate),
+    lastModifiedDate: normalizeDateTime(item.postedDate),
+    deadlineDate: normalizeDateTime(item.responseDeadLine ?? item.archiveDate, {
+      referenceValue: item.postedDate,
+      dateOnlyAsEndOfDay: true,
+    }),
     status: normalizeText(item.active === 'Yes' ? 'active' : item.active),
     classificationCodes: compactCodes(item.naicsCode ? `NAICS:${item.naicsCode}` : null, item.classificationCode ? `PSC:${item.classificationCode}` : null),
     description: redactSensitiveText(normalizeText(item.description)),
+    matchedFields: [],
+    matchReason: null,
     contractUrl: normalizeText(item.uiLink) ?? (contractId ? `https://sam.gov/opp/${contractId}/view` : null),
     scrapedAt: new Date().toISOString(),
   };
@@ -439,7 +428,7 @@ async function pushUnique(
   let saved = 0;
   for (const record of records) {
     if (remaining() <= 0) break;
-    const key = `${record.source}:${record.contractId}`;
+    const key = record.recordKey;
     if (seen.has(key)) continue;
 
     const chargeResult = await Actor.pushData(record, CONTRACT_EVENT);

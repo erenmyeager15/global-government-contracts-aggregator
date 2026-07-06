@@ -17,13 +17,14 @@ The default input searches **UK Contracts Finder** and **EU TED**. Add `sam_gov`
 ## What This Actor Extracts
 
 - Source name and keyword used
-- Contract, tender, notice, or opportunity ID
+- Stable source-scoped record key and source contract ID
 - Contract title and description
 - Buyer / contracting authority
 - Buyer country and region
 - Notice type, stage, and procurement method
 - Contract value and currency where available
-- Published date and deadline date
+- Published, last-modified, and deadline dates
+- Keyword match fields and a short match reason
 - Status such as active, closed, awarded, modified, or cancelled
 - CPV, NAICS, PSC, or other classification codes
 - Official contract or tender URL
@@ -101,11 +102,12 @@ Each dataset item represents one normalized public procurement record.
 | Field group | Important fields |
 | --- | --- |
 | Source context | `source`, `keyword`, `scrapedAt` |
-| Opportunity identity | `contractId`, `title`, `noticeType`, `stage`, `status`, `contractUrl` |
+| Opportunity identity | `recordKey`, `contractId`, `title`, `noticeType`, `stage`, `status`, `contractUrl` |
 | Buyer and location | `buyerName`, `buyerCountry`, `buyerRegion` |
-| Tender timing | `publishedDate`, `deadlineDate` |
+| Tender timing | `publishedDate`, `lastModifiedDate`, `deadlineDate` |
 | Commercial detail | `contractValue`, `currency`, `procurementMethod`, `classificationCodes` |
 | Description | `description` with email and phone-like text redacted where detected |
+| Match evidence | `matchedFields`, `matchReason` |
 
 ## Output Example
 
@@ -113,6 +115,7 @@ Each dataset item represents one normalized public procurement record.
 {
   "source": "uk_contracts_finder",
   "keyword": "software",
+  "recordKey": "uk_contracts_finder:ocds-b5fd17-example",
   "contractId": "ocds-b5fd17-example",
   "title": "Software support services",
   "buyerName": "Example Council",
@@ -123,11 +126,14 @@ Each dataset item represents one normalized public procurement record.
   "procurementMethod": "Open procedure",
   "contractValue": 250000,
   "currency": "GBP",
-  "publishedDate": "2026-06-12T10:00:00+01:00",
-  "deadlineDate": "2026-07-12T12:00:00+01:00",
+  "publishedDate": "2026-06-12T09:00:00.000Z",
+  "lastModifiedDate": "2026-06-14T08:30:00.000Z",
+  "deadlineDate": "2026-07-12T11:00:00.000Z",
   "status": "active",
   "classificationCodes": ["CPV:72000000 IT services"],
   "description": "Public contract notice summary...",
+  "matchedFields": ["description", "title", "classificationCodes"],
+  "matchReason": "Keyword \"software\" matched description, title, classificationCodes.",
   "contractUrl": "https://www.contractsfinder.service.gov.uk/Notice/...",
   "scrapedAt": "2026-06-13T17:00:00.000Z"
 }
@@ -141,10 +147,30 @@ Each dataset item represents one normalized public procurement record.
 
 Records are saved and charged atomically with `contract-scraped`. The Actor skips duplicate source IDs and stops later sources/keywords when the user's spending limit is reached.
 
+## Change Tracking And Digest Rules
+
+For recurring tender alerts, use `recordKey` as the stable identity. Do not add
+`publishedDate` or `lastModifiedDate` to the identity, because doing so turns an update
+into a duplicate opportunity.
+
+Compare the current record with the previous record for the same `recordKey`. Treat it
+as updated when `lastModifiedDate`, `deadlineDate`, `status`, `contractValue`,
+`description`, or another decision field changes. This preserves one opportunity while
+still surfacing amendments and reissued information.
+
+Date-only deadlines from sources such as TED are normalized to `23:59:59.999Z` so an
+opportunity is not treated as expired at the start of its final calendar day. Exact
+source timestamps retain their original moment after conversion to UTC.
+
+Keyword evidence checks the longer `description` first, then title, classification,
+buyer, location, notice, stage, and procurement-method fields. `matchedFields` and
+`matchReason` explain why the record entered the result set.
+
 ## Tips For Better Results
 
 - Start with `maxResults: 10` to check the output before scaling.
 - Use focused keywords such as `cybersecurity`, `software`, `facilities management`, or `medical equipment`.
+- Review `matchedFields` and `matchReason` when building qualification or alert workflows.
 - Leave `keywords` empty when you want a broad recent-opportunity feed.
 - Keep `noticeStatus` as `active` for open opportunities and switch to `all` for market research.
 - Use SAM.gov only when you have a valid public API key from SAM.gov.
@@ -153,6 +179,7 @@ Records are saved and charged atomically with `contract-scraped`. The Actor skip
 
 - Source APIs can differ in how they expose values, deadlines, locations, and classifications.
 - Some notices do not publish contract values or exact deadlines.
+- SAM.gov's public search response does not expose a separate modification timestamp, so `lastModifiedDate` falls back to `publishedDate` for that source.
 - SAM.gov data is skipped when `sam_gov` is selected without `samApiKey`.
 - Country filtering is a text filter for UK/TED and a US state-code filter for SAM.gov.
 
