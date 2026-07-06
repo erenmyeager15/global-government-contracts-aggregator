@@ -498,7 +498,7 @@ try {
   }
 } catch (error) {
   log.exception(error as Error, 'Global government contracts actor failed');
-  throw error;
-} finally {
-  await Actor.exit();
+  await Actor.fail(`Failed: ${(error as Error).message}`);
 }
+
+await Actor.exit();
