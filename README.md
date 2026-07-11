@@ -139,37 +139,39 @@ Each dataset item represents one normalized public procurement record.
 | Match evidence | `matchedFields`, `matchReason` |
 | Decision support | `fitScore`, `fitReason`, `redFlags`, `recommendedAction` |
 
-## Output Example
+## Verified Output Example
+
+The following record was saved from UK Contracts Finder by verification run `jKAewnN2Nk1XmI0pQ` on July 11, 2026. The description is shortened here for readability; the dataset retains the redacted source description.
 
 ```json
 {
   "source": "uk_contracts_finder",
   "keyword": "software",
-  "recordKey": "uk_contracts_finder:ocds-b5fd17-example",
-  "contractId": "ocds-b5fd17-example",
-  "title": "Software support services",
-  "buyerName": "Example Council",
-  "buyerCountry": "United Kingdom",
-  "buyerRegion": "London",
+  "recordKey": "uk_contracts_finder:ocds-b5fd17-5d26e35b-71a8-4b92-8178-8a47a5fef7be",
+  "contractId": "ocds-b5fd17-5d26e35b-71a8-4b92-8178-8a47a5fef7be",
+  "title": "CA18209 - The Mercian Trust Outsourced Payroll Service and HR and Payroll System",
+  "buyerName": "The Mercian Trust",
+  "buyerCountry": "England",
+  "buyerRegion": "Walsall",
   "noticeType": "tender",
   "stage": "tender",
   "procurementMethod": "Open procedure",
-  "contractValue": 250000,
+  "contractValue": 400000,
   "currency": "GBP",
-  "publishedDate": "2026-06-12T09:00:00.000Z",
-  "lastModifiedDate": "2026-06-14T08:30:00.000Z",
-  "deadlineDate": "2026-07-12T11:00:00.000Z",
+  "publishedDate": "2026-07-10T09:09:10.000Z",
+  "lastModifiedDate": "2026-07-10T09:09:10.000Z",
+  "deadlineDate": "2026-08-26T11:00:00.000Z",
   "status": "active",
-  "classificationCodes": ["CPV:72000000 IT services"],
-  "description": "Public contract notice summary...",
-  "matchedFields": ["description", "title", "classificationCodes"],
-  "matchReason": "Keyword \"software\" matched description, title, classificationCodes.",
-  "fitScore": 100,
-  "fitReason": "preferred keywords matched: software, cloud; preferred region matched: London; preferred category matched: 72000000; value meets minimum 100000; 31 day(s) remain before deadline; active tender",
-  "redFlags": [],
+  "classificationCodes": ["CPV:79631000 Personnel and payroll services"],
+  "description": "The Trust is procuring a cloud-based HR and Payroll software system and outsourced payroll service.",
+  "matchedFields": ["description"],
+  "matchReason": "Keyword \"software\" matched description.",
+  "fitScore": 80,
+  "fitReason": "preferred keywords matched: software, cloud; preferred region matched: England; contract value published; 47 day(s) remain before deadline; active tender",
+  "redFlags": ["No preferred category matched."],
   "recommendedAction": "review_now",
-  "contractUrl": "https://www.contractsfinder.service.gov.uk/Notice/...",
-  "scrapedAt": "2026-06-13T17:00:00.000Z"
+  "contractUrl": "https://www.contractsfinder.service.gov.uk/Notice/5fddd1b5-9a5f-48d0-9638-7f5377d5c06c-905563",
+  "scrapedAt": "2026-07-11T07:43:26.670Z"
 }
 ```
 
