@@ -1,6 +1,6 @@
 # Global Government Contracts & Tenders Scraper
 
-Search official public procurement opportunities from UK, EU, and US government sources in one normalized dataset. This Actor helps vendors, consultants, capture teams, proposal teams, and market researchers monitor public-sector contracts and tenders with clean fields for buyers, deadlines, values, categories, locations, statuses, and official source URLs.
+Search and triage official public procurement opportunities from UK, EU, and US government sources in one normalized dataset. This Actor helps vendors, consultants, capture teams, proposal teams, and market researchers monitor public-sector contracts and tenders with clean fields for buyers, deadlines, values, categories, locations, statuses, fit evidence, and official source URLs.
 
 Use it to build a repeatable government-contract lead feed, compare procurement markets by region or category, or export tenders into spreadsheets, CRMs, dashboards, and research workflows.
 
@@ -25,6 +25,7 @@ The default input searches **UK Contracts Finder** and **EU TED**. Add `sam_gov`
 - Contract value and currency where available
 - Published, last-modified, and deadline dates
 - Keyword match fields and a short match reason
+- Deterministic fit score, fit reason, objective red flags, and recommended action
 - Status such as active, closed, awarded, modified, or cancelled
 - CPV, NAICS, PSC, or other classification codes
 - Official contract or tender URL
@@ -42,6 +43,33 @@ The output is focused on official public procurement records and organization-le
 - Compare UK, EU, and US procurement markets in one normalized export.
 
 ## Quick Start
+
+### Ranked tender-intelligence report
+
+Use a decision profile when you want a review queue instead of only a raw tender export.
+
+```json
+{
+  "sources": ["uk_contracts_finder"],
+  "keywords": ["software"],
+  "noticeStatus": "active",
+  "decisionProfile": {
+    "preferredKeywords": ["software", "cloud", "cybersecurity"],
+    "preferredRegions": ["London", "United Kingdom"],
+    "preferredCategories": ["72000000", "IT services"],
+    "excludedKeywords": ["hardware only"],
+    "minimumContractValue": 100000,
+    "minimumValueCurrency": "GBP",
+    "minimumDaysToDeadline": 7
+  },
+  "maxResults": 10,
+  "proxyConfiguration": {
+    "useApifyProxy": false
+  }
+}
+```
+
+The Actor saves the normalized records and writes a ranked `TENDER_REPORT` Markdown file. Scores use only published notice fields; they do not predict win probability or replace a human bid/no-bid review.
 
 Use this small input for a first run without any API key:
 
@@ -91,6 +119,7 @@ To include SAM.gov, add `"sam_gov"` to `sources` and provide `samApiKey`:
 | `dateTo` | string | today | Publication end date in `YYYY-MM-DD` format. |
 | `country` | string | empty | Optional country/region text filter. For SAM.gov, use a US state code such as `CA` or `NY`. |
 | `noticeStatus` | `active`, `all` | `active` | Target active/open opportunities where supported, or include all available notices. |
+| `decisionProfile` | object | optional | Preferred keywords, regions, categories, exclusions, value threshold/currency, and minimum deadline window used for deterministic triage. |
 | `maxResults` | integer | `10` | Maximum total records saved across all selected sources and keywords. |
 | `samApiKey` | string | empty | SAM.gov public API key, required only when `sam_gov` is selected. |
 | `proxyConfiguration` | object | no proxy | Usually not needed for official APIs, but available for enterprise network routing. |
@@ -108,6 +137,7 @@ Each dataset item represents one normalized public procurement record.
 | Commercial detail | `contractValue`, `currency`, `procurementMethod`, `classificationCodes` |
 | Description | `description` with email and phone-like text redacted where detected |
 | Match evidence | `matchedFields`, `matchReason` |
+| Decision support | `fitScore`, `fitReason`, `redFlags`, `recommendedAction` |
 
 ## Output Example
 
@@ -134,6 +164,10 @@ Each dataset item represents one normalized public procurement record.
   "description": "Public contract notice summary...",
   "matchedFields": ["description", "title", "classificationCodes"],
   "matchReason": "Keyword \"software\" matched description, title, classificationCodes.",
+  "fitScore": 100,
+  "fitReason": "preferred keywords matched: software, cloud; preferred region matched: London; preferred category matched: 72000000; value meets minimum 100000; 31 day(s) remain before deadline; active tender",
+  "redFlags": [],
+  "recommendedAction": "review_now",
   "contractUrl": "https://www.contractsfinder.service.gov.uk/Notice/...",
   "scrapedAt": "2026-06-13T17:00:00.000Z"
 }
@@ -166,6 +200,20 @@ Keyword evidence checks the longer `description` first, then title, classificati
 buyer, location, notice, stage, and procurement-method fields. `matchedFields` and
 `matchReason` explain why the record entered the result set.
 
+## Fit Scoring And Recommendations
+
+The fit score is a transparent prioritization aid, not an AI prediction. It uses:
+
+- preferred and excluded keyword matches in the published notice
+- preferred buyer country/region and category/code matches
+- published contract value against an optional same-currency threshold
+- deadline availability and remaining time
+- active/closed status and tender/award stage
+
+`review_now`, `review`, `monitor`, and `skip` are deterministic recommendations. An expired/closed opportunity, an excluded keyword, or a published value below the configured minimum forces `skip`. Missing values and currency mismatches are flagged; the Actor never performs hidden exchange-rate conversion.
+
+Every run writes `TENDER_REPORT` to the default key-value store and links it from the Output tab. Opportunities are ordered by `fitScore`, with red flags and official source links visible in the same table.
+
 ## Tips For Better Results
 
 - Start with `maxResults: 10` to check the output before scaling.
@@ -179,6 +227,8 @@ buyer, location, notice, stage, and procurement-method fields. `matchedFields` a
 
 - Source APIs can differ in how they expose values, deadlines, locations, and classifications.
 - Some notices do not publish contract values or exact deadlines.
+- Fit scores depend only on fields exposed by the official source. They do not estimate competition, incumbent advantage, certification eligibility, procurement-law compliance, or win probability.
+- Contract values are compared only when the record currency matches `minimumValueCurrency`; no currency conversion is performed.
 - SAM.gov's public search response does not expose a separate modification timestamp, so `lastModifiedDate` falls back to `publishedDate` for that source.
 - SAM.gov data is skipped when `sam_gov` is selected without `samApiKey`.
 - Country filtering is a text filter for UK/TED and a US state-code filter for SAM.gov.

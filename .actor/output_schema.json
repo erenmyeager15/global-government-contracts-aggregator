@@ -1,7 +1,7 @@
 {
   "actorOutputSchemaVersion": 1,
   "title": "Global Government Contracts & Tenders Scraper Output",
-  "description": "Structured public procurement opportunity records from official US, EU, and UK sources with stable record keys, publication and modification dates, normalized deadlines, keyword match evidence, buyers, values, classifications, and official source URLs.",
+  "description": "Structured official procurement records with amendment-aware identity, deterministic bid/no-bid signals, and a ranked Markdown tender report.",
   "type": "object",
   "properties": {
     "results": {
@@ -9,6 +9,12 @@
       "title": "Government contract and tender records",
       "description": "Clean dataset items containing stable source-scoped IDs, official public procurement opportunity details, normalized dates, keyword match evidence, and source URLs.",
       "template": "{{links.apiDefaultDatasetUrl}}/items"
+    },
+    "tenderReport": {
+      "type": "string",
+      "title": "Tender intelligence report",
+      "description": "Ranked Markdown report with fit score, recommended action, buyer, region, value, deadline, evidence, red flags, and official source links.",
+      "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/TENDER_REPORT"
     }
   }
 }

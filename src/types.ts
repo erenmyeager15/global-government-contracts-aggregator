@@ -1,5 +1,27 @@
 export type SourceName = 'uk_contracts_finder' | 'ted' | 'sam_gov';
 
+export interface DecisionProfileInput {
+  preferredKeywords?: string[];
+  preferredRegions?: string[];
+  preferredCategories?: string[];
+  excludedKeywords?: string[];
+  minimumContractValue?: number;
+  minimumValueCurrency?: string;
+  minimumDaysToDeadline?: number;
+}
+
+export interface DecisionProfile {
+  preferredKeywords: string[];
+  preferredRegions: string[];
+  preferredCategories: string[];
+  excludedKeywords: string[];
+  minimumContractValue: number | null;
+  minimumValueCurrency: string | null;
+  minimumDaysToDeadline: number;
+}
+
+export type RecommendedAction = 'review_now' | 'review' | 'monitor' | 'skip';
+
 export interface ActorInput {
   sources?: SourceName[];
   keywords?: string[];
@@ -9,6 +31,7 @@ export interface ActorInput {
   noticeStatus?: 'active' | 'all';
   maxResults?: number;
   samApiKey?: string;
+  decisionProfile?: DecisionProfileInput;
   proxyConfiguration?: Record<string, unknown>;
 }
 
@@ -21,6 +44,7 @@ export interface NormalizedInput {
   noticeStatus: 'active' | 'all';
   maxResults: number;
   samApiKey: string | null;
+  decisionProfile: DecisionProfile;
 }
 
 export interface ContractRecord {
@@ -45,6 +69,10 @@ export interface ContractRecord {
   description: string | null;
   matchedFields: string[];
   matchReason: string | null;
+  fitScore: number;
+  fitReason: string;
+  redFlags: string[];
+  recommendedAction: RecommendedAction;
   contractUrl: string | null;
   scrapedAt: string;
 }

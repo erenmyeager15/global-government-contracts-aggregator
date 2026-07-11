@@ -54,6 +54,66 @@
       "enumTitles": ["Active / open", "All available"],
       "default": "active"
     },
+    "decisionProfile": {
+      "title": "Bid / opportunity profile",
+      "type": "object",
+      "description": "Optional deterministic bid/no-bid triage preferences. These settings score saved opportunities but do not change official source data or invent missing facts.",
+      "editor": "schemaBased",
+      "properties": {
+        "preferredKeywords": {
+          "title": "Preferred keywords",
+          "type": "array",
+          "description": "Terms that increase fit, such as cloud, cybersecurity, software, or managed services. Falls back to the main Keywords field when empty.",
+          "editor": "stringList",
+          "items": { "type": "string" }
+        },
+        "preferredRegions": {
+          "title": "Preferred regions",
+          "type": "array",
+          "description": "Countries, regions, or cities that increase fit, such as United Kingdom, London, Germany, or California.",
+          "editor": "stringList",
+          "items": { "type": "string" }
+        },
+        "preferredCategories": {
+          "title": "Preferred categories / codes",
+          "type": "array",
+          "description": "Category words or CPV/NAICS/PSC code fragments that increase fit, such as IT services or 72000000.",
+          "editor": "stringList",
+          "items": { "type": "string" }
+        },
+        "excludedKeywords": {
+          "title": "Excluded keywords",
+          "type": "array",
+          "description": "Terms that force a skip recommendation when found in the published opportunity text.",
+          "editor": "stringList",
+          "items": { "type": "string" }
+        },
+        "minimumContractValue": {
+          "title": "Minimum contract value",
+          "type": "number",
+          "description": "Optional minimum published value. Set Minimum value currency too; no exchange-rate conversion is performed.",
+          "editor": "number",
+          "minimum": 0
+        },
+        "minimumValueCurrency": {
+          "title": "Minimum value currency",
+          "type": "string",
+          "description": "Currency for the minimum value comparison, such as GBP, EUR, or USD. Records in another currency are flagged rather than compared.",
+          "editor": "textfield",
+          "pattern": "^[A-Za-z]{3}$"
+        },
+        "minimumDaysToDeadline": {
+          "title": "Minimum days to deadline",
+          "type": "integer",
+          "description": "Opportunities with fewer remaining days receive a warning and score penalty. Defaults to 7 days.",
+          "editor": "number",
+          "default": 7,
+          "minimum": 0,
+          "maximum": 365
+        }
+      },
+      "additionalProperties": false
+    },
     "maxResults": {
       "title": "Max results",
       "type": "integer",

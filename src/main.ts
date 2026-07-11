@@ -8,6 +8,7 @@ import {
   normalizeText,
   stableRecordKey,
 } from './tender-utils.js';
+import { applyTenderIntelligence, buildTenderReport, normalizeDecisionProfile } from './tender-intelligence.js';
 
 const DEFAULT_SOURCES: SourceName[] = ['uk_contracts_finder', 'ted'];
 const CONTRACT_EVENT = 'contract-scraped';
@@ -104,6 +105,7 @@ function normalizeInput(input: ActorInput | null): NormalizedInput {
     noticeStatus: input?.noticeStatus ?? 'active',
     maxResults: Math.min(Math.max(input?.maxResults ?? 10, 1), 1000),
     samApiKey: normalizeText(input?.samApiKey),
+    decisionProfile: normalizeDecisionProfile(input?.decisionProfile, keywords),
   };
 }
 
@@ -184,6 +186,10 @@ function normalizeUkRelease(release: UkOcdsRelease, keyword: string | null): Con
     description: redactSensitiveText(normalizeText(tender?.description)),
     matchedFields: [],
     matchReason: null,
+    fitScore: 0,
+    fitReason: 'Not scored yet.',
+    redFlags: [],
+    recommendedAction: 'monitor',
     contractUrl: contractId ? `https://www.contractsfinder.service.gov.uk/Notice/${release.id ?? contractId}` : null,
     scrapedAt: new Date().toISOString(),
   };
@@ -293,6 +299,10 @@ function normalizeTedNotice(notice: TedNotice, keyword: string | null): Contract
     description: redactSensitiveText(preferredText(notice['description-proc'])),
     matchedFields: [],
     matchReason: null,
+    fitScore: 0,
+    fitReason: 'Not scored yet.',
+    redFlags: [],
+    recommendedAction: 'monitor',
     contractUrl: htmlUrl,
     scrapedAt: new Date().toISOString(),
   };
@@ -389,6 +399,10 @@ function normalizeSamOpportunity(item: SamOpportunity, keyword: string | null): 
     description: redactSensitiveText(normalizeText(item.description)),
     matchedFields: [],
     matchReason: null,
+    fitScore: 0,
+    fitReason: 'Not scored yet.',
+    redFlags: [],
+    recommendedAction: 'monitor',
     contractUrl: normalizeText(item.uiLink) ?? (contractId ? `https://sam.gov/opp/${contractId}/view` : null),
     scrapedAt: new Date().toISOString(),
   };
@@ -424,6 +438,7 @@ async function pushUnique(
   records: ContractRecord[],
   seen: Set<string>,
   remaining: () => number,
+  savedRecords: ContractRecord[],
 ): Promise<{ saved: number; stopped: boolean }> {
   let saved = 0;
   for (const record of records) {
@@ -435,6 +450,7 @@ async function pushUnique(
     const recordWasSaved = chargeResult.chargedCount > 0 || !chargeResult.eventChargeLimitReached;
     if (recordWasSaved) {
       seen.add(key);
+      savedRecords.push(record);
       saved += 1;
     }
 
@@ -449,6 +465,7 @@ try {
   const input = normalizeInput(await Actor.getInput<ActorInput>());
   const keywords = input.keywords.length ? input.keywords : [null];
   const seen = new Set<string>();
+  const savedRecords: ContractRecord[] = [];
   let savedCount = 0;
   let stoppedByChargeLimit = false;
   const remaining = () => input.maxResults - savedCount;
@@ -479,7 +496,8 @@ try {
         records = await scrapeSam(input, keyword, remaining);
       }
 
-      const pushResult = await pushUnique(records, seen, remaining);
+      records = records.map((record) => applyTenderIntelligence(record, input.decisionProfile));
+      const pushResult = await pushUnique(records, seen, remaining, savedRecords);
       savedCount += pushResult.saved;
       stoppedByChargeLimit = pushResult.stopped;
       if (!stoppedByChargeLimit) {
@@ -487,6 +505,10 @@ try {
       }
     }
   }
+
+  await Actor.setValue('TENDER_REPORT', buildTenderReport(savedRecords, input), {
+    contentType: 'text/markdown; charset=utf-8',
+  });
 
   if (stoppedByChargeLimit) {
     const message = `Stopped at the user's spending limit after ${savedCount} contract(s).`;

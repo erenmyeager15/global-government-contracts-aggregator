@@ -26,6 +26,10 @@
           "description",
           "matchedFields",
           "matchReason",
+          "fitScore",
+          "fitReason",
+          "redFlags",
+          "recommendedAction",
           "contractUrl",
           "scrapedAt"
         ]
@@ -54,6 +58,10 @@
           "description": { "label": "Description", "format": "text" },
           "matchedFields": { "label": "Matched Fields", "format": "array" },
           "matchReason": { "label": "Match Reason", "format": "text" },
+          "fitScore": { "label": "Fit Score", "format": "number" },
+          "fitReason": { "label": "Fit Reason", "format": "text" },
+          "redFlags": { "label": "Red Flags", "format": "array" },
+          "recommendedAction": { "label": "Recommended Action", "format": "text" },
           "contractUrl": { "label": "URL", "format": "link" },
           "scrapedAt": { "label": "Scraped At", "format": "date" }
         }
