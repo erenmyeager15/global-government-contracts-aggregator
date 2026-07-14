@@ -6,5 +6,4 @@ apify_storage
 .env
 *.log
 *.tsbuildinfo
-.git
 .github
