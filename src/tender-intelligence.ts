@@ -4,6 +4,7 @@ import type {
   DecisionProfileInput,
   NormalizedInput,
   RecommendedAction,
+  SourceWarning,
 } from './types.js';
 import { normalizeText } from './tender-utils.js';
 
@@ -11,12 +12,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 function uniqueText(values: unknown): string[] {
   if (!Array.isArray(values)) return [];
-  const seen = new Set<string>();
+  const seen = new Map<string, string>();
   for (const value of values) {
     const text = normalizeText(value);
-    if (text) seen.add(text);
+    if (text && !seen.has(text.toLowerCase())) seen.set(text.toLowerCase(), text);
   }
-  return [...seen];
+  return [...seen.values()];
 }
 
 function finiteNonNegative(value: unknown): number | null {
@@ -195,7 +196,13 @@ export function applyTenderIntelligence(
 }
 
 function escapeTable(value: unknown): string {
-  return String(value ?? 'N/A').replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
+  return String(value ?? 'N/A')
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/\[/g, '\\[')
+    .replace(/\]/g, '\\]')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function valueText(record: ContractRecord): string {
@@ -203,7 +210,11 @@ function valueText(record: ContractRecord): string {
   return `${record.currency ?? ''} ${record.contractValue}`.trim();
 }
 
-export function buildTenderReport(records: ContractRecord[], input: NormalizedInput): string {
+export function buildTenderReport(
+  records: ContractRecord[],
+  input: NormalizedInput,
+  warnings: SourceWarning[] = [],
+): string {
   const ordered = [...records].sort((left, right) => right.fitScore - left.fitScore);
   const profile = input.decisionProfile;
   const lines = [
@@ -218,6 +229,15 @@ export function buildTenderReport(records: ContractRecord[], input: NormalizedIn
     'Scores are deterministic triage signals from published notice fields. Review the official source before a bid/no-bid decision.',
     '',
   ];
+
+  if (warnings.length) {
+    lines.push('## Source warnings', '');
+    for (const warning of warnings) {
+      const keyword = warning.keyword ? ` for keyword "${warning.keyword}"` : '';
+      lines.push(`- ${warning.source}${keyword}: ${warning.message}`);
+    }
+    lines.push('');
+  }
 
   if (!ordered.length) {
     lines.push('No matching opportunities were saved.');

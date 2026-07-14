@@ -62,10 +62,7 @@ Use a decision profile when you want a review queue instead of only a raw tender
     "minimumValueCurrency": "GBP",
     "minimumDaysToDeadline": 7
   },
-  "maxResults": 10,
-  "proxyConfiguration": {
-    "useApifyProxy": false
-  }
+  "maxResults": 10
 }
 ```
 
@@ -77,8 +74,6 @@ Use this small input for a first run without any API key:
 {
   "sources": ["uk_contracts_finder", "ted"],
   "keywords": ["software"],
-  "dateFrom": "2026-06-01",
-  "dateTo": "2026-06-13",
   "noticeStatus": "active",
   "maxResults": 10
 }
@@ -101,8 +96,6 @@ To include SAM.gov, add `"sam_gov"` to `sources` and provide `samApiKey`:
 {
   "sources": ["sam_gov"],
   "keywords": ["cybersecurity"],
-  "dateFrom": "2026-06-01",
-  "dateTo": "2026-06-13",
   "country": "CA",
   "samApiKey": "YOUR_SAM_GOV_API_KEY",
   "maxResults": 25
@@ -114,15 +107,15 @@ To include SAM.gov, add `"sam_gov"` to `sources` and provide `samApiKey`:
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
 | `sources` | array | `["uk_contracts_finder", "ted"]` | Official procurement sources to search. SAM.gov requires `samApiKey`. |
-| `keywords` | string array | `["software"]` | Optional search terms. Leave empty to return recent tenders from selected sources. |
-| `dateFrom` | string | 30 days ago | Publication start date in `YYYY-MM-DD` format. |
+| `keywords` | string array | `["software"]` | Up to 10 optional search terms. Leave empty to return recent tenders from selected sources. |
+| `dateFrom` | string | 30 days ago | Publication start date in `YYYY-MM-DD` format. One run can cover at most 366 days. |
 | `dateTo` | string | today | Publication end date in `YYYY-MM-DD` format. |
 | `country` | string | empty | Optional country/region text filter. For SAM.gov, use a US state code such as `CA` or `NY`. |
 | `noticeStatus` | `active`, `all` | `active` | Target active/open opportunities where supported, or include all available notices. |
 | `decisionProfile` | object | optional | Preferred keywords, regions, categories, exclusions, value threshold/currency, and minimum deadline window used for deterministic triage. |
 | `maxResults` | integer | `10` | Maximum total records saved across all selected sources and keywords. |
 | `samApiKey` | string | empty | SAM.gov public API key, required only when `sam_gov` is selected. |
-| `proxyConfiguration` | object | no proxy | Usually not needed for official APIs, but available for enterprise network routing. |
+| `proxyConfiguration` | object | no proxy | Backward-compatible setting for saved tasks. Official APIs are called directly, so enabled proxy routing is rejected. |
 
 ## Output Overview
 
@@ -138,6 +131,11 @@ Each dataset item represents one normalized public procurement record.
 | Description | `description` with email and phone-like text redacted where detected |
 | Match evidence | `matchedFields`, `matchReason` |
 | Decision support | `fitScore`, `fitReason`, `redFlags`, `recommendedAction` |
+
+Every run also writes:
+
+- `TENDER_REPORT`: ranked Markdown review queue.
+- `RUN_SUMMARY`: safe JSON outcome details, source warning counts, and spending-limit state. It never includes `samApiKey`.
 
 ## Verified Output Example
 
@@ -179,9 +177,10 @@ The following record was saved from UK Contracts Finder by verification run `jKA
 
 | Event | Price | When charged |
 | --- | ---: | --- |
+| Actor start | `$0.00005` per GB | Platform start event; at least one event per run |
 | `contract-scraped` | `$0.004` | Once per clean contract/tender record saved |
 
-Records are saved and charged atomically with `contract-scraped`. The Actor skips duplicate source IDs and stops later sources/keywords when the user's spending limit is reached.
+Records are saved and charged atomically with `contract-scraped`. Free-user rows are still counted correctly, duplicate stable opportunity IDs are skipped before billing, and the Actor stops promptly when the user's spending limit is reached. The total result allowance is divided dynamically across selected source/keyword searches so the first source cannot consume the entire run by default; unused allowance flows to later searches.
 
 ## Change Tracking And Digest Rules
 
@@ -194,9 +193,23 @@ as updated when `lastModifiedDate`, `deadlineDate`, `status`, `contractValue`,
 `description`, or another decision field changes. This preserves one opportunity while
 still surfacing amendments and reissued information.
 
+If an official source returns multiple releases for the same stable opportunity during
+one run, the Actor keeps the newest `lastModifiedDate` version instead of billing
+duplicate amendments.
+
 Date-only deadlines from sources such as TED are normalized to `23:59:59.999Z` so an
 opportunity is not treated as expired at the start of its final calendar day. Exact
 source timestamps retain their original moment after conversion to UTC.
+
+## Reliability And Run Outcomes
+
+- Official requests have bounded timeouts, polite per-host pacing, and at most three attempts.
+- Only network errors, HTTP 408/425/429, and server errors are retried. Invalid input and authentication errors fail without wasteful retries.
+- Contracts Finder pagination is restricted to its official HTTPS host. TED page repetition and malformed response shapes fail visibly.
+- SAM.gov pagination is bounded, and API keys are redacted from logs, status messages, reports, and errors.
+- A valid search with no matches succeeds with `outcome: empty` in `RUN_SUMMARY`.
+- If one source fails and another completes, the run succeeds as `partial` with safe warnings.
+- If every attempted official source fails, the run fails instead of pretending the outage was a genuine empty result.
 
 Keyword evidence checks the longer `description` first, then title, classification,
 buyer, location, notice, stage, and procurement-method fields. `matchedFields` and
@@ -219,6 +232,7 @@ Every run writes `TENDER_REPORT` to the default key-value store and links it fro
 ## Tips For Better Results
 
 - Start with `maxResults: 10` to check the output before scaling.
+- Keep one run within the 366-day publication-range limit; split larger historical backfills into separate tasks.
 - Use focused keywords such as `cybersecurity`, `software`, `facilities management`, or `medical equipment`.
 - Review `matchedFields` and `matchReason` when building qualification or alert workflows.
 - Leave `keywords` empty when you want a broad recent-opportunity feed.
@@ -232,8 +246,10 @@ Every run writes `TENDER_REPORT` to the default key-value store and links it fro
 - Fit scores depend only on fields exposed by the official source. They do not estimate competition, incumbent advantage, certification eligibility, procurement-law compliance, or win probability.
 - Contract values are compared only when the record currency matches `minimumValueCurrency`; no currency conversion is performed.
 - SAM.gov's public search response does not expose a separate modification timestamp, so `lastModifiedDate` falls back to `publishedDate` for that source.
-- SAM.gov data is skipped when `sam_gov` is selected without `samApiKey`.
-- Country filtering is a text filter for UK/TED and a US state-code filter for SAM.gov.
+- Selecting SAM.gov without `samApiKey` is an input error, so a missing credential cannot look like a genuine empty result.
+- SAM.gov may return a separate official description-API URL instead of description text. The Actor does not expose that URL as if it were a description.
+- Country filtering checks buyer country/region for UK/TED and uses a US state-code API filter for SAM.gov.
+- Source page ceilings protect runtime and official APIs. Very broad, low-signal searches may need narrower dates or keywords.
 
 ## Responsible Use
 

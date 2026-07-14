@@ -47,6 +47,12 @@ export interface NormalizedInput {
   decisionProfile: DecisionProfile;
 }
 
+export interface SourceWarning {
+  source: SourceName;
+  keyword: string | null;
+  message: string;
+}
+
 export interface ContractRecord {
   source: 'uk_contracts_finder' | 'ted' | 'sam_gov';
   keyword: string | null;
@@ -134,7 +140,7 @@ export interface SamOpportunity {
   postedDate?: string;
   type?: string;
   baseType?: string;
-  active?: string;
+  active?: boolean | string;
   responseDeadLine?: string;
   naicsCode?: string;
   classificationCode?: string;
@@ -143,4 +149,11 @@ export interface SamOpportunity {
   placeOfPerformance?: { city?: { name?: string; state?: { name?: string } }; state?: { name?: string }; country?: { name?: string } };
   uiLink?: string;
   description?: string;
+}
+
+export interface SamSearchResponse {
+  totalRecords?: number;
+  limit?: number;
+  offset?: number;
+  opportunitiesData?: SamOpportunity[];
 }

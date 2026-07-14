@@ -3,6 +3,7 @@
   "description": "Search official public procurement sources and export normalized tender records for tender digests, opportunity monitoring, and AI bid/no-bid triage.",
   "type": "object",
   "schemaVersion": 1,
+  "additionalProperties": false,
   "properties": {
     "sources": {
       "title": "Sources",
@@ -10,6 +11,8 @@
       "description": "Official procurement sources to search. Use UK Contracts Finder and EU TED for no-key public tender discovery. Select SAM.gov only when you provide a SAM.gov API key.",
       "editor": "select",
       "uniqueItems": true,
+      "minItems": 1,
+      "maxItems": 3,
       "items": {
         "type": "string",
         "enum": ["uk_contracts_finder", "ted", "sam_gov"],
@@ -23,27 +26,29 @@
       "description": "Search terms for opportunity matching, such as software, roofing, security, construction, facilities, or cybersecurity. Leave empty to return recent tenders from selected sources.",
       "editor": "stringList",
       "default": ["software"],
-      "items": { "type": "string" }
+      "maxItems": 10,
+      "items": { "type": "string", "minLength": 1, "maxLength": 100 }
     },
     "dateFrom": {
       "title": "Published from",
       "type": "string",
-      "description": "Publication start date in YYYY-MM-DD. Use this for recent-opportunity digests or backfills. Defaults to 30 days ago.",
+      "description": "Publication start date in YYYY-MM-DD. Defaults to 30 days ago. A single run can cover at most 366 days.",
       "editor": "datepicker",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
     },
     "dateTo": {
       "title": "Published to",
       "type": "string",
-      "description": "Publication end date in YYYY-MM-DD. Use with Published from to bound a weekly or daily digest. Defaults to today.",
+      "description": "Publication end date in YYYY-MM-DD. Defaults to today and must be on or after Published from.",
       "editor": "datepicker",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
     },
     "country": {
       "title": "Country filter",
       "type": "string",
-      "description": "Optional country, region, or state filter. For SAM.gov use a US state code like CA or NY. For UK/TED, this is applied as a text filter.",
-      "editor": "textfield"
+      "description": "Optional country, region, or state filter. For SAM.gov use a US state code like CA or NY. For UK/TED, this matches the normalized buyer country or region.",
+      "editor": "textfield",
+      "maxLength": 100
     },
     "noticeStatus": {
       "title": "Notice status",
@@ -65,28 +70,32 @@
           "type": "array",
           "description": "Terms that increase fit, such as cloud, cybersecurity, software, or managed services. Falls back to the main Keywords field when empty.",
           "editor": "stringList",
-          "items": { "type": "string" }
+          "maxItems": 20,
+          "items": { "type": "string", "minLength": 1, "maxLength": 100 }
         },
         "preferredRegions": {
           "title": "Preferred regions",
           "type": "array",
           "description": "Countries, regions, or cities that increase fit, such as United Kingdom, London, Germany, or California.",
           "editor": "stringList",
-          "items": { "type": "string" }
+          "maxItems": 20,
+          "items": { "type": "string", "minLength": 1, "maxLength": 100 }
         },
         "preferredCategories": {
           "title": "Preferred categories / codes",
           "type": "array",
           "description": "Category words or CPV/NAICS/PSC code fragments that increase fit, such as IT services or 72000000.",
           "editor": "stringList",
-          "items": { "type": "string" }
+          "maxItems": 20,
+          "items": { "type": "string", "minLength": 1, "maxLength": 100 }
         },
         "excludedKeywords": {
           "title": "Excluded keywords",
           "type": "array",
           "description": "Terms that force a skip recommendation when found in the published opportunity text.",
           "editor": "stringList",
-          "items": { "type": "string" }
+          "maxItems": 20,
+          "items": { "type": "string", "minLength": 1, "maxLength": 100 }
         },
         "minimumContractValue": {
           "title": "Minimum contract value",
@@ -100,6 +109,7 @@
           "type": "string",
           "description": "Currency for the minimum value comparison, such as GBP, EUR, or USD. Records in another currency are flagged rather than compared.",
           "editor": "textfield",
+          "maxLength": 3,
           "pattern": "^[A-Za-z]{3}$"
         },
         "minimumDaysToDeadline": {
@@ -134,7 +144,7 @@
     "proxyConfiguration": {
       "title": "Proxy configuration",
       "type": "object",
-      "description": "Not usually needed for official APIs, but available for enterprise network routing.",
+      "description": "Compatibility setting for older saved tasks. Official API calls are direct; leave Apify Proxy disabled. Enabled proxy routing is rejected.",
       "editor": "proxy",
       "default": { "useApifyProxy": false }
     }

@@ -15,6 +15,12 @@
       "title": "Tender intelligence report",
       "description": "Ranked Markdown report with fit score, recommended action, buyer, region, value, deadline, evidence, red flags, and official source links.",
       "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/TENDER_REPORT"
+    },
+    "runSummary": {
+      "type": "string",
+      "title": "Run outcome and source diagnostics",
+      "description": "Safe JSON summary distinguishing success, legitimate empty output, partial source failure, total source outage, and spending-limit stops.",
+      "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/RUN_SUMMARY"
     }
   }
 }

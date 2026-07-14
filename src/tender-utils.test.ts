@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { ContractRecord } from './types.js';
-import { keywordMatch, latestDateTime, normalizeDateTime, stableRecordKey } from './tender-utils.js';
+import {
+  keywordMatch,
+  latestDateTime,
+  latestDeadlineDateTime,
+  locationMatches,
+  normalizeDateTime,
+  stableRecordKey,
+} from './tender-utils.js';
 
 function record(overrides: Partial<ContractRecord> = {}): ContractRecord {
   return {
@@ -47,6 +54,19 @@ test('keeps publication dates at the start of a date-only UTC day', () => {
   assert.equal(normalizeDateTime('2026-07-06'), '2026-07-06T00:00:00.000Z');
 });
 
+test('normalizes a TED date-only value with a timezone suffix', () => {
+  assert.equal(normalizeDateTime('2026-07-06+02:00'), '2026-07-06T00:00:00.000Z');
+});
+
+test('rejects impossible calendar dates instead of rolling them forward', () => {
+  assert.equal(normalizeDateTime('2026-02-30'), null);
+  assert.equal(normalizeDateTime('2026-02-30T10:00:00Z'), null);
+});
+
+test('treats timezone-less ISO source timestamps as UTC', () => {
+  assert.equal(normalizeDateTime('2026-07-06T10:30:00'), '2026-07-06T10:30:00.000Z');
+});
+
 test('preserves exact timestamps', () => {
   assert.equal(
     normalizeDateTime('2026-07-31T12:30:00+01:00', { dateOnlyAsEndOfDay: true }),
@@ -59,6 +79,17 @@ test('selects the latest supplied modification date', () => {
     latestDateTime(['2026-07-03', '2026-07-06', 'invalid']),
     '2026-07-06T00:00:00.000Z',
   );
+});
+
+test('selects the latest multi-lot deadline and keeps the final calendar day', () => {
+  assert.equal(
+    latestDeadlineDateTime(['2026-07-20+02:00', '2026-07-31+02:00']),
+    '2026-07-31T23:59:59.999Z',
+  );
+});
+
+test('matches a country name against TED alpha-3 country codes', () => {
+  assert.equal(locationMatches(record({ source: 'ted', buyerCountry: 'DEU' }), 'Germany'), true);
 });
 
 test('builds a source-scoped stable record key', () => {
