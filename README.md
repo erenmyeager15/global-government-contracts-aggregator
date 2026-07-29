@@ -178,7 +178,7 @@ The following record was saved from UK Contracts Finder by verification run `jKA
 | Event | Price | When charged |
 | --- | ---: | --- |
 | Actor start | `$0.00005` per GB | Platform start event; at least one event per run |
-| `contract-scraped` | `$0.004` | Once per clean contract/tender record saved |
+| `contract-scraped` | `$0.002` | Once per clean contract/tender record saved |
 
 Records are saved and charged atomically with `contract-scraped`. Free-user rows are still counted correctly, duplicate stable opportunity IDs are skipped before billing, and the Actor stops promptly when the user's spending limit is reached. The total result allowance is divided dynamically across selected source/keyword searches so the first source cannot consume the entire run by default; unused allowance flows to later searches.
 
