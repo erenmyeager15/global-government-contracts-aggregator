@@ -1,8 +1,21 @@
-# Global Government Contracts & Tenders Scraper
+# Government Contracts & Tenders - UK, EU & US
 
-Search and triage official public procurement opportunities from UK, EU, and US government sources in one normalized dataset. This Actor helps vendors, consultants, capture teams, proposal teams, and market researchers monitor public-sector contracts and tenders with clean fields for buyers, deadlines, values, categories, locations, statuses, fit evidence, and official source URLs.
+Find active government contracts from official UK Contracts Finder, EU TED, and optional SAM.gov sources in one normalized dataset. Start with UK and EU searches without an API key, pay $0.002 per saved tender, and export buyers, deadlines, values, categories, fit scores, and official source URLs.
 
 Use it to build a repeatable government-contract lead feed, compare procurement markets by region or category, or export tenders into spreadsheets, CRMs, dashboards, and research workflows.
+
+## Start Without an API Key
+
+This small first run searches active software tenders from the UK and EU and saves at most 10 records:
+
+```json
+{
+  "sources": ["uk_contracts_finder", "ted"],
+  "keywords": ["software"],
+  "noticeStatus": "active",
+  "maxResults": 10
+}
+```
 
 ## Supported Sources
 

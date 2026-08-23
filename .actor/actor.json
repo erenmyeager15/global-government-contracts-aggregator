@@ -1,13 +1,17 @@
 {
   "actorSpecification": 1,
   "name": "global-government-contracts-aggregator",
-  "title": "Global Government Contracts & Tenders Scraper",
-  "description": "Find and triage public tenders from official UK Contracts Finder, EU TED, and optional SAM.gov sources. Returns stable IDs, buyers, dates, values, match evidence, deterministic fit scores, red flags, recommended actions, official URLs, and a ranked Markdown report.",
+  "title": "Government Contracts & Tenders - UK, EU & US - $2/1k",
+  "description": "Find active public tenders from official UK Contracts Finder, EU TED, and optional SAM.gov sources. Export buyers, deadlines, values, fit scores, and official URLs. No API key is needed for UK or EU searches.",
   "version": "1.0",
   "dockerfile": "Dockerfile",
   "input": "../INPUT_SCHEMA.json",
   "readme": "../README.md",
   "output": "./output_schema.json",
+  "exampleRunInput": {
+    "contentType": "application/json; charset=utf-8",
+    "body": "{\"sources\":[\"uk_contracts_finder\",\"ted\"],\"keywords\":[\"software\"],\"noticeStatus\":\"active\",\"maxResults\":10}"
+  },
   "categories": ["BUSINESS", "AUTOMATION"],
   "categoriesVersion": "1.0.0",
   "pricingInfo": {
