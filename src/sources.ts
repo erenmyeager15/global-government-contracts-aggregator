@@ -9,6 +9,8 @@ import type {
   SourceName,
   TedNotice,
   UkOcdsRelease,
+  UsaSpendingAward,
+  UsaSpendingSearchResponse,
 } from './types.js';
 import {
   chooseNewerRecord,
@@ -23,6 +25,7 @@ import {
 } from './tender-utils.js';
 
 const SOURCE_PACING_MS: Record<SourceName, number> = {
+  usaspending_awards: 250,
   uk_contracts_finder: 250,
   ted: 250,
   sam_gov: 250,
@@ -203,6 +206,7 @@ export function normalizeUkRelease(
     contractId,
     title,
     buyerName: truncateText(buyer?.name, 500),
+    recipientName: null,
     buyerCountry: truncateText(locationAddress?.countryName, 200),
     buyerRegion: truncateText(locationAddress?.region ?? locationAddress?.locality, 200),
     noticeType: truncateText(release.tag?.join(', '), 200),
@@ -213,6 +217,8 @@ export function normalizeUkRelease(
     publishedDate,
     lastModifiedDate,
     deadlineDate: normalizeDateTime(tender?.tenderPeriod?.endDate, { dateOnlyAsEndOfDay: true }),
+    performanceStartDate: null,
+    performanceEndDate: null,
     status: truncateText(tender?.status, 100),
     classificationCodes: compactCodes(
       classification ? `${classification.scheme ?? 'CPV'}:${classification.id ?? ''} ${classification.description ?? ''}` : null,
@@ -341,6 +347,7 @@ export function normalizeTedNotice(
     contractId,
     title,
     buyerName: truncateText(preferredText(notice['buyer-name']), 500),
+    recipientName: null,
     buyerCountry: truncateText(preferredText(notice['buyer-country'] ?? notice['place-of-performance-country']), 200),
     buyerRegion: null,
     noticeType: truncateText(
@@ -354,6 +361,8 @@ export function normalizeTedNotice(
     publishedDate,
     lastModifiedDate,
     deadlineDate,
+    performanceStartDate: null,
+    performanceEndDate: null,
     status: tedStatus(notice, stage, deadlineDate, now),
     classificationCodes: compactCodes(notice['classification-cpv']),
     description: redactSensitiveText(preferredText(notice['description-proc'])),
@@ -447,6 +456,7 @@ export function normalizeSamOpportunity(
     contractId,
     title,
     buyerName: truncateText(item.fullParentPathName ?? item.subTier ?? item.department, 500),
+    recipientName: null,
     buyerCountry: truncateText(place?.country?.name ?? 'United States', 200),
     buyerRegion: truncateText(place?.state?.name ?? place?.city?.state?.name ?? place?.city?.name, 200),
     noticeType: truncateText(item.type ?? item.baseType, 200),
@@ -457,6 +467,8 @@ export function normalizeSamOpportunity(
     publishedDate: normalizeDateTime(item.postedDate),
     lastModifiedDate: normalizeDateTime(item.postedDate),
     deadlineDate: normalizeDateTime(item.responseDeadLine ?? item.archiveDate, { dateOnlyAsEndOfDay: true }),
+    performanceStartDate: null,
+    performanceEndDate: null,
     status: samStatus(item),
     classificationCodes: compactCodes(
       item.naicsCode ? `NAICS:${item.naicsCode}` : null,
@@ -526,10 +538,132 @@ async function scrapeSam(options: SourceScrapeOptions): Promise<ContractRecord[]
   return orderedRecords(records, limit);
 }
 
+const USASPENDING_FIELDS = [
+  'Award ID',
+  'Recipient Name',
+  'Award Amount',
+  'Awarding Agency',
+  'Awarding Sub Agency',
+  'Start Date',
+  'End Date',
+  'Description',
+  'Last Modified Date',
+  'Base Obligation Date',
+  'Contract Award Type',
+  'Place of Performance State Code',
+  'Place of Performance Country Code',
+  'NAICS Code',
+  'NAICS Description',
+  'PSC Code',
+  'PSC Description',
+] as const;
+
+export function normalizeUsaSpendingAward(
+  item: UsaSpendingAward,
+  keyword: string | null,
+  scrapedAt = new Date().toISOString(),
+): ContractRecord | null {
+  const contractId = truncateText(item.generated_internal_id ?? item['Award ID'], 500);
+  const awardId = truncateText(item['Award ID'], 500);
+  const description = truncateText(item.Description, 500);
+  const title = description ?? (awardId ? `US federal contract award ${awardId}` : null);
+  if (!title || !contractId) return null;
+
+  const amount = contractValueOrNull(item['Award Amount']);
+  const performanceState = truncateText(item['Place of Performance State Code'], 200);
+  const performanceCountry = truncateText(item['Place of Performance Country Code'], 200);
+  const awardUrl = `https://www.usaspending.gov/award/${encodeURIComponent(contractId)}`;
+
+  return {
+    source: 'usaspending_awards',
+    keyword,
+    recordKey: stableRecordKey('usaspending_awards', contractId),
+    contractId,
+    title,
+    buyerName: truncateText(item['Awarding Sub Agency'] ?? item['Awarding Agency'], 500),
+    recipientName: truncateText(item['Recipient Name'], 500),
+    buyerCountry: performanceCountry === 'USA' ? 'United States' : performanceCountry,
+    buyerRegion: performanceState,
+    noticeType: truncateText(item['Contract Award Type'], 200),
+    stage: 'award',
+    procurementMethod: truncateText(item['Contract Award Type'], 300),
+    contractValue: amount,
+    currency: amount === null ? null : 'USD',
+    publishedDate: normalizeDateTime(item['Base Obligation Date'] ?? item['Start Date']),
+    lastModifiedDate: normalizeDateTime(item['Last Modified Date'] ?? item['Base Obligation Date']),
+    deadlineDate: null,
+    performanceStartDate: normalizeDateTime(item['Start Date']),
+    performanceEndDate: normalizeDateTime(item['End Date'], { dateOnlyAsEndOfDay: true }),
+    status: 'awarded',
+    classificationCodes: compactCodes(
+      item['NAICS Code'] ? `NAICS:${item['NAICS Code']} ${item['NAICS Description'] ?? ''}` : null,
+      item['PSC Code'] ? `PSC:${item['PSC Code']} ${item['PSC Description'] ?? ''}` : null,
+    ),
+    description: redactSensitiveText(item.Description),
+    matchedFields: [],
+    matchReason: null,
+    fitScore: 0,
+    fitReason: 'Not scored yet.',
+    redFlags: [],
+    recommendedAction: 'monitor',
+    contractUrl: awardUrl,
+    scrapedAt,
+  };
+}
+
+async function scrapeUsaSpending(options: SourceScrapeOptions): Promise<ContractRecord[]> {
+  const { input, keyword, limit, excludedKeys } = options;
+  const fetcher = options.fetcher ?? fetchJson;
+  const now = options.now ?? new Date();
+  const records = new Map<string, ContractRecord>();
+  const pageSize = Math.min(100, Math.max(10, limit * 3));
+  const maxPages = Math.min(20, Math.max(3, Math.ceil(limit / pageSize) + 2));
+  let cursor: { last_record_unique_id?: number; last_record_sort_value?: string } = {};
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const filters: Record<string, unknown> = {
+      time_period: [{ start_date: input.dateFrom, end_date: input.dateTo }],
+      award_type_codes: ['A', 'B', 'C', 'D'],
+    };
+    if (keyword) filters.keywords = [keyword];
+
+    const body = {
+      spending_level: 'awards',
+      fields: USASPENDING_FIELDS,
+      sort: 'Last Modified Date',
+      order: 'desc',
+      limit: pageSize,
+      page,
+      filters,
+      ...cursor,
+    };
+    const data = await fetcher<UsaSpendingSearchResponse>(
+      'https://api.usaspending.gov/api/v2/search/spending_by_award/',
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
+      { timeoutMs: 25_000, maxAttempts: 3, minIntervalMs: SOURCE_PACING_MS.usaspending_awards },
+    );
+    if (!data || typeof data !== 'object' || !Array.isArray(data.results)) {
+      throw new Error('USAspending.gov returned an unexpected response shape.');
+    }
+
+    for (const item of data.results) {
+      const normalized = normalizeUsaSpendingAward(item, keyword, now.toISOString());
+      addCandidate(records, normalized ? withFilters(normalized, keyword, input.country) : null, excludedKeys);
+    }
+    if (records.size >= limit || !data.page_metadata?.hasNext || data.results.length < pageSize) break;
+    const nextUniqueId = data.page_metadata.last_record_unique_id;
+    const nextSortValue = data.page_metadata.last_record_sort_value;
+    if (nextUniqueId === undefined || !nextSortValue) break;
+    cursor = { last_record_unique_id: nextUniqueId, last_record_sort_value: nextSortValue };
+  }
+  return orderedRecords(records, limit);
+}
+
 export async function scrapeSource(
   source: SourceName,
   options: SourceScrapeOptions,
 ): Promise<ContractRecord[]> {
+  if (source === 'usaspending_awards') return scrapeUsaSpending(options);
   if (source === 'uk_contracts_finder') return scrapeUk(options);
   if (source === 'ted') return scrapeTed(options);
   return scrapeSam(options);

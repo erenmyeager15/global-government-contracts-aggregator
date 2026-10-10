@@ -1,18 +1,20 @@
-# Government Contracts & Tenders - UK, EU & US
+# US Government Contracts & Global Tenders Monitor
 
-Find active government contracts from official UK Contracts Finder, EU TED, and optional SAM.gov sources in one normalized dataset. Start with UK and EU searches without an API key, pay $0.002 per saved tender, and export buyers, deadlines, values, categories, fit scores, and official source URLs.
+Track US federal contract awards from USAspending.gov and discover opportunities from official UK Contracts Finder, EU TED, and optional SAM.gov in one normalized dataset. USAspending, UK, and EU searches need no API key. Pay $0.002 per saved record and export buyers, award recipients, values, deadlines, qualification evidence, field-level changes, and official source URLs.
 
-Use it to build a repeatable government-contract lead feed, compare procurement markets by region or category, or export tenders into spreadsheets, CRMs, dashboards, and research workflows.
+Use it to build a repeatable GovCon lead feed, find prime contractors after awards, qualify open tenders, compare procurement markets, or send a complete change-labelled portfolio into spreadsheets, CRMs, dashboards, and AI workflows.
 
 ## Start Without an API Key
 
-This small first run searches active software tenders from the UK and EU and saves at most 10 records:
+This small US-first run finds recent federal cybersecurity awards and saves at most 10 records:
 
 ```json
 {
-  "sources": ["uk_contracts_finder", "ted"],
-  "keywords": ["software"],
+  "sources": ["usaspending_awards"],
+  "keywords": ["cybersecurity"],
   "noticeStatus": "active",
+  "trackChanges": true,
+  "monitorName": "us-cybersecurity-awards",
   "maxResults": 10
 }
 ```
@@ -21,11 +23,12 @@ This small first run searches active software tenders from the UK and EU and sav
 
 | Source | Coverage | API key required | Notes |
 | --- | --- | --- | --- |
+| USAspending.gov | US federal contract awards | No | Buyer agency, award recipient, amount, performance period, and modification date from the official API. |
 | UK Contracts Finder | UK public-sector tenders and notices | No | Uses the official OCDS API. |
 | EU TED | EU public procurement notices | No | Uses the official TED Search API. |
 | SAM.gov | US federal opportunities | Yes | Requires your own SAM.gov public API key. |
 
-The default input searches **UK Contracts Finder** and **EU TED**. Add `sam_gov` only when you have a SAM.gov API key.
+The default input includes **USAspending awards**, **UK Contracts Finder**, and **EU TED**. Add `sam_gov` only when you have a SAM.gov public API key.
 
 ## What This Actor Extracts
 
@@ -33,16 +36,19 @@ The default input searches **UK Contracts Finder** and **EU TED**. Add `sam_gov`
 - Stable source-scoped record key and source contract ID
 - Contract title and description
 - Buyer / contracting authority
+- Award recipient / prime contractor when published
 - Buyer country and region
 - Notice type, stage, and procurement method
 - Contract value and currency where available
 - Published, last-modified, and deadline dates
+- Award performance start and end dates
 - Keyword match fields and a short match reason
 - Deterministic fit score, fit reason, objective red flags, and recommended action
 - Status such as active, closed, awarded, modified, or cancelled
 - CPV, NAICS, PSC, or other classification codes
 - Official contract or tender URL
 - Scraped timestamp
+- Named monitoring status, previous values, value/deadline deltas, and evidence-based change signals
 
 The output is focused on official public procurement records and organization-level opportunity data. The Actor redacts email addresses and phone numbers from descriptions and does not intentionally collect personal contact lists, private account data, or non-public information.
 
@@ -51,13 +57,14 @@ The output is focused on official public procurement records and organization-le
 - Monitor new government contracts and tenders by keyword.
 - Build public-sector opportunity feeds for vendors and consultants.
 - Track deadlines for proposal, bid, capture, and sales teams.
+- Find award recipients for teaming, subcontracting, and competitor intelligence.
 - Research procurement demand by country, buyer, category, value, and status.
 - Feed dashboards, spreadsheets, CRMs, or internal lead-scoring workflows.
 - Compare UK, EU, and US procurement markets in one normalized export.
 
 ## Quick Start
 
-### Ranked tender-intelligence report
+### US award and tender intelligence report
 
 Use a decision profile when you want a review queue instead of only a raw tender export.
 
@@ -79,7 +86,7 @@ Use a decision profile when you want a review queue instead of only a raw tender
 }
 ```
 
-The Actor saves the normalized records and writes a ranked `TENDER_REPORT` Markdown file. Scores use only published notice fields; they do not predict win probability or replace a human bid/no-bid review.
+The Actor saves the normalized records and writes a ranked `TENDER_REPORT` Markdown file. Tender rows receive bid-review actions; award rows can become `partner_lead` records when the published evidence fits. Scores do not predict win probability or replace human review.
 
 Use this small input for a first run without any API key:
 
@@ -119,7 +126,7 @@ To include SAM.gov, add `"sam_gov"` to `sources` and provide `samApiKey`:
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `sources` | array | `["uk_contracts_finder", "ted"]` | Official procurement sources to search. SAM.gov requires `samApiKey`. |
+| `sources` | array | USAspending + UK + EU | Official procurement sources to search. Only SAM.gov requires `samApiKey`. |
 | `keywords` | string array | `["software"]` | Up to 10 optional search terms. Leave empty to return recent tenders from selected sources. |
 | `dateFrom` | string | 30 days ago | Publication start date in `YYYY-MM-DD` format. One run can cover at most 366 days. |
 | `dateTo` | string | today | Publication end date in `YYYY-MM-DD` format. |
@@ -128,6 +135,9 @@ To include SAM.gov, add `"sam_gov"` to `sources` and provide `samApiKey`:
 | `decisionProfile` | object | optional | Preferred keywords, regions, categories, exclusions, value threshold/currency, and minimum deadline window used for deterministic triage. |
 | `maxResults` | integer | `10` | Maximum total records saved across all selected sources and keywords. |
 | `samApiKey` | string | empty | SAM.gov public API key, required only when `sam_gov` is selected. |
+| `trackChanges` | boolean | `true` | Add a bounded private history and label every current row baseline, updated, unchanged, or partial. |
+| `monitorName` | string | `default` | Independent watchlist name. Reuse the same name on scheduled runs. |
+| `observationHistoryLimit` | integer | `12` | Prior observations retained per stable record, from 2-30. |
 | `proxyConfiguration` | object | no proxy | Backward-compatible setting for saved tasks. Official APIs are called directly, so enabled proxy routing is rejected. |
 
 ## Output Overview
@@ -138,12 +148,13 @@ Each dataset item represents one normalized public procurement record.
 | --- | --- |
 | Source context | `source`, `keyword`, `scrapedAt` |
 | Opportunity identity | `recordKey`, `contractId`, `title`, `noticeType`, `stage`, `status`, `contractUrl` |
-| Buyer and location | `buyerName`, `buyerCountry`, `buyerRegion` |
-| Tender timing | `publishedDate`, `lastModifiedDate`, `deadlineDate` |
+| Buyer, recipient and location | `buyerName`, `recipientName`, `buyerCountry`, `buyerRegion` |
+| Timing | `publishedDate`, `lastModifiedDate`, `deadlineDate`, `performanceStartDate`, `performanceEndDate` |
 | Commercial detail | `contractValue`, `currency`, `procurementMethod`, `classificationCodes` |
 | Description | `description` with email and phone-like text redacted where detected |
 | Match evidence | `matchedFields`, `matchReason` |
 | Decision support | `fitScore`, `fitReason`, `redFlags`, `recommendedAction` |
+| Monitoring | `monitoringStatus`, `changedFields`, previous values, `contractValueDelta`, `deadlineChangeDays`, `changeSignals`, observation timestamps/count |
 
 Every run also writes:
 
@@ -195,16 +206,22 @@ The following record was saved from UK Contracts Finder by verification run `jKA
 
 Records are saved and charged atomically with `contract-scraped`. Free-user rows are still counted correctly, duplicate stable opportunity IDs are skipped before billing, and the Actor stops promptly when the user's spending limit is reached. The total result allowance is divided dynamically across selected source/keyword searches so the first source cannot consume the entire run by default; unused allowance flows to later searches.
 
-## Change Tracking And Digest Rules
+## Complete Change-Labelled Monitoring
 
-For recurring tender alerts, use `recordKey` as the stable identity. Do not add
-`publishedDate` or `lastModifiedDate` to the identity, because doing so turns an update
-into a duplicate opportunity.
+Enable `trackChanges` and reuse one `monitorName` for scheduled runs. The Actor uses
+`recordKey` as the stable identity. Publication and modification dates are deliberately
+excluded from identity so an amendment remains the same opportunity or award.
 
-Compare the current record with the previous record for the same `recordKey`. Treat it
-as updated when `lastModifiedDate`, `deadlineDate`, `status`, `contractValue`,
-`description`, or another decision field changes. This preserves one opportunity while
-still surfacing amendments and reissued information.
+Every run still returns the complete current export. Each row is labelled `baseline`,
+`updated`, `unchanged`, or `partial`, with changed fields, previous values, value and
+deadline deltas, fit-score movement, and signals such as `recipient_changed`,
+`deadline_extended`, or `contract_value_increased`. This differs from changed-only
+feeds that make a missing row ambiguous.
+
+History is private to the Actor account, separated by a hashed monitor name, bounded
+to 2-30 observations per record, and committed only after the corresponding dataset
+row is saved. A missing value never silently overwrites the last known value. Absence
+from a capped search is not treated as proof that a tender closed or an award vanished.
 
 If an official source returns multiple releases for the same stable opportunity during
 one run, the Actor keeps the newest `lastModifiedDate` version instead of billing
@@ -259,6 +276,7 @@ Every run writes `TENDER_REPORT` to the default key-value store and links it fro
 - Fit scores depend only on fields exposed by the official source. They do not estimate competition, incumbent advantage, certification eligibility, procurement-law compliance, or win probability.
 - Contract values are compared only when the record currency matches `minimumValueCurrency`; no currency conversion is performed.
 - SAM.gov's public search response does not expose a separate modification timestamp, so `lastModifiedDate` falls back to `publishedDate` for that source.
+- USAspending is post-award data, not an open-opportunity feed. Use optional SAM.gov for US bid opportunities and USAspending for buyer, recipient, amount, and award-change intelligence.
 - Selecting SAM.gov without `samApiKey` is an input error, so a missing credential cannot look like a genuine empty result.
 - SAM.gov may return a separate official description-API URL instead of description text. The Actor does not expose that URL as if it were a description.
 - Country filtering checks buyer country/region for UK/TED and uses a US state-code API filter for SAM.gov.

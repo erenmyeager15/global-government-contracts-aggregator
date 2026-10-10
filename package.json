@@ -1,14 +1,15 @@
 {
   "name": "global-government-contracts-aggregator",
   "version": "1.0.0",
-  "description": "Apify Actor for official government contract and tender data from SAM.gov, TED, and UK Contracts Finder.",
+  "description": "US federal award monitoring and global tender intelligence from official USAspending, SAM.gov, TED, and UK Contracts Finder sources.",
   "main": "dist/main.js",
   "type": "module",
   "scripts": {
     "start": "node dist/main.js",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test dist/*.test.js"
+    "test": "npm run build && node --test dist/*.test.js",
+    "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
     "apify": "^3.2.5"
@@ -19,7 +20,9 @@
     "typescript": "^5.7.0"
   },
   "overrides": {
-    "brace-expansion": "5.0.9"
+    "apify-client": "2.25.0",
+    "basic-ftp": "6.2.2",
+    "brace-expansion": "5.0.12"
   },
   "engines": {
     "node": ">=20.0.0"

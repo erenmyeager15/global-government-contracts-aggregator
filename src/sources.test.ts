@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { JsonFetcher } from './http.js';
-import { normalizeSamOpportunity, normalizeTedNotice, normalizeUkRelease, scrapeSource } from './sources.js';
+import {
+  normalizeSamOpportunity,
+  normalizeTedNotice,
+  normalizeUkRelease,
+  normalizeUsaSpendingAward,
+  scrapeSource,
+} from './sources.js';
 import type { NormalizedInput, UkOcdsRelease } from './types.js';
 
 function input(overrides: Partial<NormalizedInput> = {}): NormalizedInput {
@@ -23,6 +29,9 @@ function input(overrides: Partial<NormalizedInput> = {}): NormalizedInput {
       minimumValueCurrency: null,
       minimumDaysToDeadline: 7,
     },
+    trackChanges: true,
+    monitorName: 'default',
+    observationHistoryLimit: 12,
     ...overrides,
   };
 }
@@ -81,6 +90,75 @@ test('does not expose SAM description API links as tender descriptions', () => {
   assert.equal(record?.description, null);
   assert.equal(record?.contractUrl, 'https://sam.gov/opp/sam-id/view');
   assert.equal(record?.status, 'active');
+});
+
+test('normalizes a USAspending contract award with recipient and performance dates', () => {
+  const record = normalizeUsaSpendingAward({
+    generated_internal_id: 'CONT_AWD_123',
+    'Award ID': 'FA1234-26-C-0001',
+    'Recipient Name': 'Example Cybersecurity Inc.',
+    'Award Amount': 1250000,
+    'Awarding Agency': 'Department of Homeland Security',
+    'Awarding Sub Agency': 'Cybersecurity and Infrastructure Security Agency',
+    'Start Date': '2026-07-01',
+    'End Date': '2027-06-30',
+    Description: 'Security operations support. Email buyer@example.gov.',
+    'Last Modified Date': '2026-07-12',
+    'Base Obligation Date': '2026-07-01',
+    'Contract Award Type': 'Definitive Contract',
+    'Place of Performance State Code': 'VA',
+    'Place of Performance Country Code': 'USA',
+    'NAICS Code': '541512',
+    'NAICS Description': 'Computer Systems Design Services',
+    'PSC Code': 'D310',
+    'PSC Description': 'Cyber Security and Data Backup',
+  }, 'cybersecurity', '2026-07-14T00:00:00.000Z');
+  assert.equal(record?.source, 'usaspending_awards');
+  assert.equal(record?.recipientName, 'Example Cybersecurity Inc.');
+  assert.equal(record?.stage, 'award');
+  assert.equal(record?.contractValue, 1250000);
+  assert.equal(record?.currency, 'USD');
+  assert.equal(record?.performanceEndDate, '2027-06-30T23:59:59.999Z');
+  assert.match(record?.description ?? '', /\[redacted email\]/);
+  assert.equal(record?.contractUrl, 'https://www.usaspending.gov/award/CONT_AWD_123');
+});
+
+test('queries USAspending without an API key and returns matching awards', async () => {
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  const fetcher = (async (url: string, init?: RequestInit) => {
+    requests.push({ url, init });
+    return {
+      results: [{
+        generated_internal_id: 'CONT_AWD_456',
+        'Award ID': 'FA1234-26-C-0002',
+        'Recipient Name': 'Example Software LLC',
+        'Award Amount': 500000,
+        'Awarding Agency': 'Department of Defense',
+        'Start Date': '2026-07-05',
+        'End Date': '2027-07-04',
+        Description: 'Cloud software engineering services',
+        'Last Modified Date': '2026-07-12',
+        'Base Obligation Date': '2026-07-05',
+        'Place of Performance Country Code': 'USA',
+      }],
+      page_metadata: { hasNext: false },
+    };
+  }) as JsonFetcher;
+  const records = await scrapeSource('usaspending_awards', {
+    input: input({ sources: ['usaspending_awards'], country: 'United States' }),
+    keyword: 'software',
+    limit: 1,
+    excludedKeys: new Set(),
+    fetcher,
+    now: new Date('2026-07-14T00:00:00.000Z'),
+  });
+  assert.equal(records.length, 1);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, 'https://api.usaspending.gov/api/v2/search/spending_by_award/');
+  const body = JSON.parse(String(requests[0].init?.body)) as { filters: { keywords: string[]; award_type_codes: string[] } };
+  assert.deepEqual(body.filters.keywords, ['software']);
+  assert.deepEqual(body.filters.award_type_codes, ['A', 'B', 'C', 'D']);
+  assert.doesNotMatch(JSON.stringify(requests[0]), /api[_-]?key/i);
 });
 
 test('keeps only the newest UK amendment for a stable record key', async () => {

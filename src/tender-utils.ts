@@ -5,6 +5,7 @@ export type MatchField =
   | 'title'
   | 'classificationCodes'
   | 'buyerName'
+  | 'recipientName'
   | 'buyerCountry'
   | 'buyerRegion'
   | 'noticeType'
@@ -51,15 +52,20 @@ export function normalizeDateTime(
   const text = normalizeText(value);
   if (!text) return null;
 
+  // USAspending emits timestamps such as 2026-10-08 18:42:00. Accept that
+  // documented source shape while keeping the parser strict and timezone-safe.
+  const spaceSeparated = text.match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})?)$/);
+  const normalizedText = spaceSeparated ? `${spaceSeparated[1]}T${spaceSeparated[2]}` : text;
+
   // TED returns calendar dates with an offset but no time, for example
   // 2026-07-01+02:00. Treat those as calendar dates rather than invalid datetimes.
-  const dateOnly = text.match(/^(\d{4}-\d{2}-\d{2})(?:Z|[+-]\d{2}:\d{2})?$/);
+  const dateOnly = normalizedText.match(/^(\d{4}-\d{2}-\d{2})(?:Z|[+-]\d{2}:\d{2})?$/);
   if (dateOnly && !isCalendarDate(dateOnly[1])) return null;
-  const dateTime = text.match(/^(\d{4}-\d{2}-\d{2})T/);
+  const dateTime = normalizedText.match(/^(\d{4}-\d{2}-\d{2})T/);
   if (!dateOnly && (!dateTime || !isCalendarDate(dateTime[1]))) return null;
   let candidate = dateOnly
     ? `${dateOnly[1]}T${options.dateOnlyAsEndOfDay ? '23:59:59.999' : '00:00:00.000'}Z`
-    : text;
+    : normalizedText;
   if (!dateOnly && !/(?:Z|[+-]\d{2}:\d{2})$/i.test(candidate)) candidate = `${candidate}Z`;
 
   const parsed = new Date(candidate);
@@ -100,6 +106,7 @@ function searchableFields(record: ContractRecord): Array<[MatchField, string | n
     ['title', record.title],
     ['classificationCodes', normalizeText(record.classificationCodes.join(' '))],
     ['buyerName', record.buyerName],
+    ['recipientName', record.recipientName],
     ['buyerCountry', record.buyerCountry],
     ['buyerRegion', record.buyerRegion],
     ['noticeType', record.noticeType],
@@ -170,10 +177,12 @@ export function chooseNewerRecord(
 
   const completeness = (record: ContractRecord): number => [
     record.buyerName,
+    record.recipientName,
     record.buyerCountry,
     record.buyerRegion,
     record.contractValue,
     record.deadlineDate,
+    record.performanceEndDate,
     record.description,
     ...record.classificationCodes,
   ].filter((value) => value !== null && value !== '').length;

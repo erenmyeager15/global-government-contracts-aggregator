@@ -1,6 +1,6 @@
 {
-  "title": "Global Government Contracts & Tenders Scraper Input",
-  "description": "Search official public procurement sources and export normalized tender records for tender digests, opportunity monitoring, and AI bid/no-bid triage.",
+  "title": "US Government Contracts & Global Tenders Monitor Input",
+  "description": "Search official US, UK, and EU procurement sources and export normalized opportunities and awards with named change tracking and transparent qualification.",
   "type": "object",
   "schemaVersion": 1,
   "additionalProperties": false,
@@ -8,17 +8,17 @@
     "sources": {
       "title": "Sources",
       "type": "array",
-      "description": "Official procurement sources to search. Use UK Contracts Finder and EU TED for no-key public tender discovery. Select SAM.gov only when you provide a SAM.gov API key.",
+      "description": "Official procurement sources to search. USAspending awards, UK Contracts Finder, and EU TED need no API key. Select SAM.gov opportunities only when you provide a SAM.gov public API key.",
       "editor": "select",
       "uniqueItems": true,
       "minItems": 1,
-      "maxItems": 3,
+      "maxItems": 4,
       "items": {
         "type": "string",
-        "enum": ["uk_contracts_finder", "ted", "sam_gov"],
-        "enumTitles": ["UK Contracts Finder", "EU TED", "SAM.gov"]
+        "enum": ["usaspending_awards", "uk_contracts_finder", "ted", "sam_gov"],
+        "enumTitles": ["USAspending contract awards (no key)", "UK Contracts Finder", "EU TED", "SAM.gov opportunities (API key)"]
       },
-      "default": ["uk_contracts_finder", "ted"]
+      "default": ["usaspending_awards", "uk_contracts_finder", "ted"]
     },
     "keywords": {
       "title": "Keywords",
@@ -53,7 +53,7 @@
     "noticeStatus": {
       "title": "Notice status",
       "type": "string",
-      "description": "Which opportunity status to target where supported. Use Active / open for actionable alerts and All available for research/backfills.",
+      "description": "Which tender status to target where supported. USAspending contract awards are included regardless because they are post-award intelligence records, not open bid deadlines.",
       "editor": "select",
       "enum": ["active", "all"],
       "enumTitles": ["Active / open", "All available"],
@@ -140,6 +140,32 @@
       "description": "Optional SAM.gov public API key. Required only when SAM.gov is selected.",
       "editor": "textfield",
       "isSecret": true
+    },
+    "trackChanges": {
+      "title": "Track changes across scheduled runs",
+      "type": "boolean",
+      "description": "Keep a bounded private history for each stable notice or award and label every returned row baseline, updated, unchanged, or partial. The Actor still returns a complete current export instead of silently hiding unchanged records.",
+      "editor": "checkbox",
+      "default": true
+    },
+    "monitorName": {
+      "title": "Monitor name",
+      "type": "string",
+      "description": "Name for an independent recurring watchlist, such as us-cybersecurity or federal-health-awards. Use the same name on repeat runs.",
+      "editor": "textfield",
+      "default": "default",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9 _-]+$"
+    },
+    "observationHistoryLimit": {
+      "title": "Observations retained per record",
+      "type": "integer",
+      "description": "Bounded number of prior observations kept privately for each contract identity.",
+      "editor": "number",
+      "default": 12,
+      "minimum": 2,
+      "maximum": 30
     },
     "proxyConfiguration": {
       "title": "Proxy configuration",

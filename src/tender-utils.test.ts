@@ -18,6 +18,7 @@ function record(overrides: Partial<ContractRecord> = {}): ContractRecord {
     contractId: 'ocds-test',
     title: 'Managed network services',
     buyerName: 'Example Council',
+    recipientName: null,
     buyerCountry: 'United Kingdom',
     buyerRegion: 'London',
     noticeType: 'tender',
@@ -28,6 +29,8 @@ function record(overrides: Partial<ContractRecord> = {}): ContractRecord {
     publishedDate: '2026-07-06T00:00:00.000Z',
     lastModifiedDate: '2026-07-06T10:00:00.000Z',
     deadlineDate: '2026-07-31T23:59:59.999Z',
+    performanceStartDate: null,
+    performanceEndDate: null,
     status: 'active',
     classificationCodes: ['CPV:72000000 IT services'],
     description: 'Supply a cybersecurity monitoring platform.',
@@ -65,6 +68,13 @@ test('rejects impossible calendar dates instead of rolling them forward', () => 
 
 test('treats timezone-less ISO source timestamps as UTC', () => {
   assert.equal(normalizeDateTime('2026-07-06T10:30:00'), '2026-07-06T10:30:00.000Z');
+});
+
+test('normalizes USAspending space-separated timestamps as UTC', () => {
+  assert.equal(
+    normalizeDateTime('2026-10-08 18:42:00'),
+    '2026-10-08T18:42:00.000Z',
+  );
 });
 
 test('preserves exact timestamps', () => {

@@ -1,4 +1,4 @@
-export type SourceName = 'uk_contracts_finder' | 'ted' | 'sam_gov';
+export type SourceName = 'usaspending_awards' | 'uk_contracts_finder' | 'ted' | 'sam_gov';
 
 export interface DecisionProfileInput {
   preferredKeywords?: string[];
@@ -20,7 +20,7 @@ export interface DecisionProfile {
   minimumDaysToDeadline: number;
 }
 
-export type RecommendedAction = 'review_now' | 'review' | 'monitor' | 'skip';
+export type RecommendedAction = 'review_now' | 'review' | 'partner_lead' | 'monitor' | 'skip';
 
 export interface ActorInput {
   sources?: SourceName[];
@@ -32,6 +32,9 @@ export interface ActorInput {
   maxResults?: number;
   samApiKey?: string;
   decisionProfile?: DecisionProfileInput;
+  trackChanges?: boolean;
+  monitorName?: string;
+  observationHistoryLimit?: number;
   proxyConfiguration?: Record<string, unknown>;
 }
 
@@ -45,6 +48,9 @@ export interface NormalizedInput {
   maxResults: number;
   samApiKey: string | null;
   decisionProfile: DecisionProfile;
+  trackChanges: boolean;
+  monitorName: string;
+  observationHistoryLimit: number;
 }
 
 export interface SourceWarning {
@@ -54,12 +60,13 @@ export interface SourceWarning {
 }
 
 export interface ContractRecord {
-  source: 'uk_contracts_finder' | 'ted' | 'sam_gov';
+  source: SourceName;
   keyword: string | null;
   recordKey: string;
   contractId: string;
   title: string;
   buyerName: string | null;
+  recipientName: string | null;
   buyerCountry: string | null;
   buyerRegion: string | null;
   noticeType: string | null;
@@ -70,6 +77,8 @@ export interface ContractRecord {
   publishedDate: string | null;
   lastModifiedDate: string | null;
   deadlineDate: string | null;
+  performanceStartDate: string | null;
+  performanceEndDate: string | null;
   status: string | null;
   classificationCodes: string[];
   description: string | null;
@@ -81,6 +90,43 @@ export interface ContractRecord {
   recommendedAction: RecommendedAction;
   contractUrl: string | null;
   scrapedAt: string;
+  monitorName?: string | null;
+  monitoringStatus?: 'baseline' | 'updated' | 'unchanged' | 'partial' | null;
+  firstSeenAt?: string | null;
+  previousSeenAt?: string | null;
+  observationCount?: number | null;
+  changedFields?: string[];
+  previousContractValue?: number | null;
+  contractValueDelta?: number | null;
+  previousDeadlineDate?: string | null;
+  deadlineChangeDays?: number | null;
+  previousStatus?: string | null;
+  previousRecipientName?: string | null;
+  previousFitScore?: number | null;
+  fitScoreDelta?: number | null;
+  changeSignals?: string[];
+}
+
+export interface TenderObservation {
+  checkedAt: string;
+  title: string;
+  buyerName: string | null;
+  recipientName: string | null;
+  contractValue: number | null;
+  currency: string | null;
+  lastModifiedDate: string | null;
+  deadlineDate: string | null;
+  performanceEndDate: string | null;
+  status: string | null;
+  fitScore: number;
+  recommendedAction: RecommendedAction;
+}
+
+export interface TenderMonitoringState {
+  schemaVersion: 1;
+  firstSeenAt: string;
+  observationCount: number;
+  history: TenderObservation[];
 }
 
 export interface UkOcdsRelease {
@@ -156,4 +202,39 @@ export interface SamSearchResponse {
   limit?: number;
   offset?: number;
   opportunitiesData?: SamOpportunity[];
+}
+
+export interface UsaSpendingAward {
+  internal_id?: number;
+  generated_internal_id?: string;
+  'Award ID'?: string;
+  'Recipient Name'?: string;
+  'Award Amount'?: number | string;
+  'Awarding Agency'?: string;
+  'Awarding Sub Agency'?: string;
+  'Start Date'?: string;
+  'End Date'?: string;
+  Description?: string;
+  'Last Modified Date'?: string;
+  'Base Obligation Date'?: string;
+  'Contract Award Type'?: string;
+  'Place of Performance State Code'?: string;
+  'Place of Performance Country Code'?: string;
+  'NAICS Code'?: string;
+  'NAICS Description'?: string;
+  'PSC Code'?: string;
+  'PSC Description'?: string;
+}
+
+export interface UsaSpendingSearchResponse {
+  spending_level?: string;
+  limit?: number;
+  results?: UsaSpendingAward[];
+  page_metadata?: {
+    page?: number;
+    hasNext?: boolean;
+    last_record_unique_id?: number;
+    last_record_sort_value?: string;
+  };
+  messages?: string[];
 }

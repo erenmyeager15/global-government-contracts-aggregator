@@ -4,7 +4,7 @@ import { normalizeText } from './tender-utils.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_DATE_RANGE_DAYS = 365;
-const VALID_SOURCES = new Set<SourceName>(['uk_contracts_finder', 'ted', 'sam_gov']);
+const VALID_SOURCES = new Set<SourceName>(['usaspending_awards', 'uk_contracts_finder', 'ted', 'sam_gov']);
 const TOP_LEVEL_FIELDS = new Set([
   'sources',
   'keywords',
@@ -15,6 +15,9 @@ const TOP_LEVEL_FIELDS = new Set([
   'decisionProfile',
   'maxResults',
   'samApiKey',
+  'trackChanges',
+  'monitorName',
+  'observationHistoryLimit',
   'proxyConfiguration',
 ]);
 const PROFILE_FIELDS = new Set([
@@ -88,9 +91,9 @@ function stringArray(
 }
 
 function normalizeSources(value: unknown): SourceName[] {
-  if (value === undefined) return ['uk_contracts_finder', 'ted'];
-  if (!Array.isArray(value) || value.length < 1 || value.length > 3) {
-    throw new Error('sources must contain between 1 and 3 supported sources.');
+  if (value === undefined) return ['usaspending_awards', 'uk_contracts_finder', 'ted'];
+  if (!Array.isArray(value) || value.length < 1 || value.length > 4) {
+    throw new Error('sources must contain between 1 and 4 supported sources.');
   }
 
   const result: SourceName[] = [];
@@ -199,6 +202,19 @@ export function normalizeInput(raw: unknown, now = new Date()): NormalizedInput 
   }
   validateDisabledProxy(input.proxyConfiguration);
 
+  const trackChanges = input.trackChanges ?? true;
+  if (typeof trackChanges !== 'boolean') throw new Error('trackChanges must be a boolean.');
+  const monitorName = boundedText(input.monitorName, 'monitorName', 64) ?? 'default';
+  if (!/^[A-Za-z0-9 _-]+$/.test(monitorName)) {
+    throw new Error('monitorName may contain only letters, numbers, spaces, underscores, and hyphens.');
+  }
+  const observationHistoryLimit = input.observationHistoryLimit ?? 12;
+  if (!Number.isInteger(observationHistoryLimit)
+    || (observationHistoryLimit as number) < 2
+    || (observationHistoryLimit as number) > 30) {
+    throw new Error('observationHistoryLimit must be an integer from 2 to 30.');
+  }
+
   const decisionProfileInput = normalizeProfile(input.decisionProfile);
   return {
     sources,
@@ -210,5 +226,8 @@ export function normalizeInput(raw: unknown, now = new Date()): NormalizedInput 
     maxResults: maxResults as number,
     samApiKey,
     decisionProfile: normalizeDecisionProfile(decisionProfileInput, keywords),
+    trackChanges,
+    monitorName,
+    observationHistoryLimit: observationHistoryLimit as number,
   };
 }

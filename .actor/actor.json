@@ -1,8 +1,8 @@
 {
   "actorSpecification": 1,
   "name": "global-government-contracts-aggregator",
-  "title": "Government Contracts & Tenders - UK, EU & US - $2/1k",
-  "description": "Find active public tenders from official UK Contracts Finder, EU TED, and optional SAM.gov sources. Export buyers, deadlines, values, fit scores, and official URLs. No API key is needed for UK or EU searches.",
+  "title": "US Government Contracts & Global Tenders Monitor",
+  "description": "Track US federal awards plus UK, EU, and optional SAM.gov opportunities. Get buyers, awardees, values, deadlines, transparent fit scores, and change history from official sources.",
   "version": "1.0",
   "dockerfile": "Dockerfile",
   "input": "../INPUT_SCHEMA.json",
@@ -10,7 +10,7 @@
   "output": "./output_schema.json",
   "exampleRunInput": {
     "contentType": "application/json; charset=utf-8",
-    "body": "{\"sources\":[\"uk_contracts_finder\",\"ted\"],\"keywords\":[\"software\"],\"noticeStatus\":\"active\",\"maxResults\":10}"
+    "body": "{\"sources\":[\"usaspending_awards\"],\"keywords\":[\"cybersecurity\"],\"noticeStatus\":\"active\",\"trackChanges\":true,\"monitorName\":\"us-cybersecurity-awards\",\"maxResults\":10}"
   },
   "categories": ["BUSINESS", "AUTOMATION"],
   "categoriesVersion": "1.0.0",
@@ -40,7 +40,7 @@
   },
   "defaultRunOptions": {
     "build": "latest",
-    "memoryMbytes": 512,
+    "memoryMbytes": 256,
     "timeoutSecs": 3600
   }
 }

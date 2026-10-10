@@ -55,6 +55,7 @@ function opportunityText(record: ContractRecord): string {
     record.description,
     record.classificationCodes.join(' '),
     record.buyerName,
+    record.recipientName,
     record.buyerCountry,
     record.buyerRegion,
     record.noticeType,
@@ -62,8 +63,9 @@ function opportunityText(record: ContractRecord): string {
   ].filter(Boolean).join(' '));
 }
 
-function actionFor(score: number, blocking: boolean): RecommendedAction {
+function actionFor(score: number, blocking: boolean, stage: string): RecommendedAction {
   if (blocking) return 'skip';
+  if (stage === 'award') return score >= 55 ? 'partner_lead' : 'monitor';
   if (score >= 75) return 'review_now';
   if (score >= 55) return 'review';
   if (score >= 35) return 'monitor';
@@ -149,7 +151,17 @@ export function applyTenderIntelligence(
     reasons.push('contract value published');
   }
 
-  if (!record.deadlineDate) {
+  const isAward = lower(record.stage) === 'award';
+  if (isAward) {
+    reasons.push('published contract award');
+    if (record.recipientName) {
+      score += 15;
+      reasons.push('recipient organization published');
+    } else {
+      score -= 5;
+      redFlags.push('Award recipient is not published.');
+    }
+  } else if (!record.deadlineDate) {
     score -= 5;
     redFlags.push('Deadline is not published.');
   } else {
@@ -173,15 +185,15 @@ export function applyTenderIntelligence(
 
   const status = lower(record.status);
   const stage = lower(record.stage);
-  const closed = /closed|cancelled|canceled|awarded|modified/.test(status) || /award|contract_modification/.test(stage);
-  if (closed) {
+  const closed = /closed|cancelled|canceled|modified/.test(status) || /contract_modification/.test(stage);
+  if (!isAward && closed) {
     score -= 20;
     blocking = true;
     redFlags.push(`Opportunity is not an active tender (${record.status ?? record.stage ?? 'unknown'}).`);
-  } else if (/active|open/.test(status) && stage === 'tender') {
+  } else if (!isAward && /active|open/.test(status) && stage === 'tender') {
     score += 10;
     reasons.push('active tender');
-  } else {
+  } else if (!isAward) {
     redFlags.push('Opportunity status or stage is uncertain.');
   }
 
@@ -191,7 +203,7 @@ export function applyTenderIntelligence(
     fitScore: score,
     fitReason: reasons.length ? reasons.join('; ') : 'No positive fit evidence was available.',
     redFlags,
-    recommendedAction: actionFor(score, blocking),
+    recommendedAction: actionFor(score, blocking, stage),
   };
 }
 
@@ -244,10 +256,10 @@ export function buildTenderReport(
     return `${lines.join('\n')}\n`;
   }
 
-  lines.push('| Score | Action | Opportunity | Buyer | Region | Value | Deadline | Match evidence | Red flags |', '| ---: | --- | --- | --- | --- | ---: | --- | --- | --- |');
+  lines.push('| Change | Score | Action | Opportunity | Buyer | Recipient | Region | Value | Deadline / end | Match evidence | Red flags |', '| --- | ---: | --- | --- | --- | --- | --- | ---: | --- | --- | --- |');
   for (const record of ordered) {
     const title = record.contractUrl ? `[${escapeTable(record.title)}](${record.contractUrl})` : escapeTable(record.title);
-    lines.push(`| ${record.fitScore} | ${record.recommendedAction} | ${title} | ${escapeTable(record.buyerName)} | ${escapeTable(record.buyerRegion ?? record.buyerCountry)} | ${valueText(record)} | ${escapeTable(record.deadlineDate)} | ${escapeTable(record.fitReason)} | ${escapeTable(record.redFlags.join(' ') || 'None')} |`);
+    lines.push(`| ${escapeTable(record.monitoringStatus ?? 'not tracked')} | ${record.fitScore} | ${record.recommendedAction} | ${title} | ${escapeTable(record.buyerName)} | ${escapeTable(record.recipientName)} | ${escapeTable(record.buyerRegion ?? record.buyerCountry)} | ${valueText(record)} | ${escapeTable(record.deadlineDate ?? record.performanceEndDate)} | ${escapeTable(record.fitReason)} | ${escapeTable(record.redFlags.join(' ') || 'None')} |`);
   }
 
   return `${lines.join('\n')}\n`;

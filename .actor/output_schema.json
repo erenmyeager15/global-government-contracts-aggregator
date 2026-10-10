@@ -1,19 +1,19 @@
 {
   "actorOutputSchemaVersion": 1,
-  "title": "Global Government Contracts & Tenders Scraper Output",
-  "description": "Structured official procurement records with amendment-aware identity, deterministic bid/no-bid signals, and a ranked Markdown tender report.",
+  "title": "US Government Contracts & Global Tenders Monitor Output",
+  "description": "Structured official procurement records with US awardees, amendment-aware identity, named change history, deterministic opportunity signals, and a ranked Markdown report.",
   "type": "object",
   "properties": {
     "results": {
       "type": "string",
       "title": "Government contract and tender records",
-      "description": "Clean dataset items containing stable source-scoped IDs, official public procurement opportunity details, normalized dates, keyword match evidence, and source URLs.",
+      "description": "Complete current records with stable identities, US award recipients, normalized dates, monitoring status, field-level changes, keyword evidence, and official source URLs.",
       "template": "{{links.apiDefaultDatasetUrl}}/items"
     },
     "tenderReport": {
       "type": "string",
       "title": "Tender intelligence report",
-      "description": "Ranked Markdown report with fit score, recommended action, buyer, region, value, deadline, evidence, red flags, and official source links.",
+      "description": "Ranked Markdown report with change status, fit score, recommended action, buyer, award recipient, region, value, deadline or performance end, evidence, and official links.",
       "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/TENDER_REPORT"
     },
     "runSummary": {

@@ -6,11 +6,38 @@ const NOW = new Date('2026-07-14T12:00:00.000Z');
 
 test('normalizes defaults and keeps the schema default keyword', () => {
   const input = normalizeInput(null, NOW);
-  assert.deepEqual(input.sources, ['uk_contracts_finder', 'ted']);
+  assert.deepEqual(input.sources, ['usaspending_awards', 'uk_contracts_finder', 'ted']);
   assert.deepEqual(input.keywords, ['software']);
   assert.equal(input.dateFrom, '2026-06-14');
   assert.equal(input.dateTo, '2026-07-14');
   assert.equal(input.maxResults, 10);
+  assert.equal(input.trackChanges, true);
+  assert.equal(input.monitorName, 'default');
+  assert.equal(input.observationHistoryLimit, 12);
+});
+
+test('normalizes named monitoring settings', () => {
+  const input = normalizeInput({
+    sources: ['usaspending_awards'],
+    maxResults: 25,
+    trackChanges: false,
+    monitorName: 'US Cyber Awards 2026',
+    observationHistoryLimit: 20,
+  }, NOW);
+  assert.equal(input.trackChanges, false);
+  assert.equal(input.monitorName, 'US Cyber Awards 2026');
+  assert.equal(input.observationHistoryLimit, 20);
+});
+
+test('rejects unsafe monitor names and history limits', () => {
+  assert.throws(
+    () => normalizeInput({ sources: ['usaspending_awards'], maxResults: 1, monitorName: 'bad/name' }, NOW),
+    /monitorName/,
+  );
+  assert.throws(
+    () => normalizeInput({ sources: ['usaspending_awards'], maxResults: 1, observationHistoryLimit: 31 }, NOW),
+    /observationHistoryLimit/,
+  );
 });
 
 test('deduplicates sources and keywords case-insensitively', () => {

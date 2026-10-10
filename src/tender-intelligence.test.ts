@@ -15,6 +15,7 @@ function record(overrides: Partial<ContractRecord> = {}): ContractRecord {
     contractId: 'ocds-test',
     title: 'Cloud software support services',
     buyerName: 'Example Council',
+    recipientName: null,
     buyerCountry: 'United Kingdom',
     buyerRegion: 'London',
     noticeType: 'tender',
@@ -25,6 +26,8 @@ function record(overrides: Partial<ContractRecord> = {}): ContractRecord {
     publishedDate: '2026-07-01T00:00:00.000Z',
     lastModifiedDate: '2026-07-06T10:00:00.000Z',
     deadlineDate: '2026-08-10T23:59:59.999Z',
+    performanceStartDate: null,
+    performanceEndDate: null,
     status: 'active',
     classificationCodes: ['CPV:72000000 IT services'],
     description: 'Provide cloud software and managed support services.',
@@ -66,6 +69,21 @@ test('a strong active opportunity is ranked for immediate review', () => {
   assert.equal(scored.recommendedAction, 'review_now');
   assert.deepEqual(scored.redFlags, []);
   assert.match(scored.fitReason, /preferred region matched: London/);
+});
+
+test('a strong published award becomes a partner lead without deadline penalties', () => {
+  const scored = applyTenderIntelligence(record({
+    source: 'usaspending_awards',
+    stage: 'award',
+    noticeType: 'Definitive Contract',
+    status: 'awarded',
+    recipientName: 'Example Software Inc.',
+    deadlineDate: null,
+    currency: 'GBP',
+  }), profile(), new Date('2026-07-11T00:00:00.000Z'));
+  assert.equal(scored.recommendedAction, 'partner_lead');
+  assert.doesNotMatch(scored.redFlags.join(' '), /deadline/i);
+  assert.match(scored.fitReason, /published contract award/i);
 });
 
 test('an expired opportunity is blocked even when content fit is strong', () => {
@@ -119,6 +137,9 @@ test('the report sorts the highest fit opportunity first', () => {
     maxResults: 2,
     samApiKey: null,
     decisionProfile: profile(),
+    trackChanges: true,
+    monitorName: 'default',
+    observationHistoryLimit: 12,
   };
   const report = buildTenderReport([weak, strong], input);
   assert.ok(report.indexOf('Cloud software support services') < report.indexOf('Office furniture supply'));

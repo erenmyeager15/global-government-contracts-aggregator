@@ -1,8 +1,11 @@
 {
-  "sources": ["uk_contracts_finder", "ted"],
-  "keywords": ["software"],
+  "sources": ["usaspending_awards"],
+  "keywords": ["cybersecurity"],
   "noticeStatus": "active",
-  "maxResults": 2,
+  "maxResults": 10,
+  "trackChanges": true,
+  "monitorName": "us-cybersecurity-awards",
+  "observationHistoryLimit": 12,
   "proxyConfiguration": {
     "useApifyProxy": false
   }

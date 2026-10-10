@@ -6,6 +6,7 @@ const PHONE_PATTERN = /(?<![\w-])(?:\+?\d[\d\s().-]{9,13}\d)(?![\w-])/g;
 const EMAIL_DETECTION_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const PHONE_DETECTION_PATTERN = /(?<![\w-])(?:\+?\d[\d\s().-]{9,13}\d)(?![\w-])/;
 const OFFICIAL_BASE_HOSTS: Record<ContractRecord['source'], string> = {
+  usaspending_awards: 'usaspending.gov',
   uk_contracts_finder: 'contractsfinder.service.gov.uk',
   ted: 'ted.europa.eu',
   sam_gov: 'sam.gov',
@@ -55,6 +56,8 @@ export function assertSafeRecord(record: ContractRecord): ContractRecord {
   if (!isNormalizedDate(record.publishedDate)
     || !isNormalizedDate(record.lastModifiedDate)
     || !isNormalizedDate(record.deadlineDate)
+    || !isNormalizedDate(record.performanceStartDate)
+    || !isNormalizedDate(record.performanceEndDate)
     || !isNormalizedDate(record.scrapedAt)) {
     throw new Error(`Record ${record.recordKey} has an invalid normalized date.`);
   }
